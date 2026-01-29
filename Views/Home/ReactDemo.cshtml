@@ -1,0 +1,30 @@
+@{
+    ViewData["Title"] = "React Demo";
+}
+
+<div class="text-center">
+    <h1 class="display-4">React Integration Demo</h1>
+    <p class="lead">This page demonstrates React.js working within your ASP.NET Core MVC application.</p>
+    
+    <hr class="my-4" />
+    
+    <div class="alert alert-info" role="alert">
+        <strong>How it works:</strong> The React component below is rendered by React.js, 
+        while the rest of the page uses traditional Razor views. This is the hybrid approach (Option 1).
+    </div>
+
+    <!-- React component will be mounted here -->
+    <div id="react-root"></div>
+
+    <hr class="my-4" />
+
+    <div class="mt-4">
+        <h3>Next Steps</h3>
+        <ul class="list-unstyled text-start" style="max-width: 600px; margin: 0 auto;">
+            <li>✅ React is now integrated into your project</li>
+            <li>✅ You can add React components to any Razor view</li>
+            <li>✅ Use <code>&lt;div id="your-id"&gt;&lt;/div&gt;</code> and mount components in <code>ClientApp/index.jsx</code></li>
+            <li>✅ Run <code>npm run dev</code> for hot reload during development</li>
+        </ul>
+    </div>
+</div>
