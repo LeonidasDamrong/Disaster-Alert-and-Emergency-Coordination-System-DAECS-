@@ -22,9 +22,9 @@
     <Exec Command="npm install" />
   </Target>
 
-  <Target Name="NpmBuild" BeforeTargets="Build" DependsOnTargets="NpmInstall">
-    <Message Text="Building React bundle..." Importance="high" />
-    <Exec Command="npm run build" />
+  <Target Name="BuildReactApp" BeforeTargets="Build">
+    <Message Importance="high" Text="Building React bundle..." />
+    <Exec Command="npm run build" WorkingDirectory="$(ProjectDir)" />
   </Target>
 
 </Project>
