@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -93,7 +93,7 @@ export const AlertBroadcasting = () => {
                 <Label>Alert Title *</Label>
                 <Input
                   value={newAlert.title}
-                  onChange={(e) => setNewAlert({...newAlert, title: e.target.value})}
+                  onChange={(e) => setNewAlert({ ...newAlert, title: e.target.value })}
                   placeholder="Enter alert title"
                 />
               </div>
@@ -101,7 +101,7 @@ export const AlertBroadcasting = () => {
                 <Label>Alert Message *</Label>
                 <Textarea
                   value={newAlert.message}
-                  onChange={(e) => setNewAlert({...newAlert, message: e.target.value})}
+                  onChange={(e) => setNewAlert({ ...newAlert, message: e.target.value })}
                   placeholder="Enter detailed alert message"
                   rows={4}
                 />
@@ -109,7 +109,7 @@ export const AlertBroadcasting = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Alert Type *</Label>
-                  <Select value={newAlert.type} onValueChange={(value) => setNewAlert({...newAlert, type: value as AlertType})}>
+                  <Select value={newAlert.type} onValueChange={(value) => setNewAlert({ ...newAlert, type: value as AlertType })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -125,7 +125,7 @@ export const AlertBroadcasting = () => {
                   <Label>Target Audience *</Label>
                   <Input
                     value={newAlert.targetAudience}
-                    onChange={(e) => setNewAlert({...newAlert, targetAudience: e.target.value})}
+                    onChange={(e) => setNewAlert({ ...newAlert, targetAudience: e.target.value })}
                     placeholder="e.g., Kuala Lumpur, All Districts"
                   />
                 </div>
@@ -135,7 +135,7 @@ export const AlertBroadcasting = () => {
                 <Input
                   type="datetime-local"
                   value={newAlert.scheduledFor}
-                  onChange={(e) => setNewAlert({...newAlert, scheduledFor: e.target.value})}
+                  onChange={(e) => setNewAlert({ ...newAlert, scheduledFor: e.target.value })}
                 />
               </div>
               <div className="flex gap-3">
@@ -221,8 +221,8 @@ export const AlertBroadcasting = () => {
                   <TableCell>
                     <Badge variant={
                       alert.status === 'Sent' ? 'default' :
-                      alert.status === 'Scheduled' ? 'secondary' :
-                      'outline'
+                        alert.status === 'Scheduled' ? 'secondary' :
+                          'outline'
                     }>
                       {alert.status}
                     </Badge>
