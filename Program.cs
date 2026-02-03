@@ -68,6 +68,9 @@ app.MapControllerRoute(
 
 app.MapRazorPages();
 
+// SPA fallback for React Router - catch all routes and serve index
+app.MapFallbackToController("Index", "Home");
+
 // Apply migrations automatically on startup (for Azure)
 if (app.Environment.IsProduction())
 {
