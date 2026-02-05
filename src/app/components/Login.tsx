@@ -12,10 +12,10 @@ export const Login = () => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -24,12 +24,12 @@ export const Login = () => {
       return;
     }
 
-    const success = login(userId, password);
+    const result = await login(userId, password);
 
-    if (success) {
+    if (result.success) {
       navigate('/dashboard');
     } else {
-      setError('Invalid User ID or Password');
+      setError(result.error || 'Invalid User ID or Password');
     }
   };
 
@@ -82,19 +82,19 @@ export const Login = () => {
               />
             </div>
 
-            <Button type="submit" className="w-full h-11 bg-red-600 hover:bg-red-700">
-              Sign In
+            <Button type="submit" className="w-full h-11 bg-red-600 hover:bg-red-700" disabled={isLoading}>
+              {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
 
-            {/* <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-sm font-semibold text-blue-900 mb-2">Demo Credentials:</p>
               <div className="text-xs space-y-1 text-blue-800">
-                <p>Admin: <span className="font-mono">admin001 / admin123</span></p>
-                <p>Officer: <span className="font-mono">officer001 / officer123</span></p>
-                <p>Shelter Manager: <span className="font-mono">shelter001 / shelter123</span></p>
-                <p>Resource Manager: <span className="font-mono">resource001 / resource123</span></p>
+                <p>Admin: <span className="font-mono">admin001 / Admin@123</span></p>
+                <p>Officer: <span className="font-mono">officer001 / Officer@123</span></p>
+                <p>Shelter Manager: <span className="font-mono">shelter001 / Shelter@123</span></p>
+                <p>Resource Manager: <span className="font-mono">resource001 / Resource@123</span></p>
               </div>
-            </div> */}
+            </div>
           </form>
         </CardContent>
       </Card>
