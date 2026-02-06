@@ -98,6 +98,7 @@ namespace FYP_Project_II.Controllers
             return Ok(new { message = "User registered successfully" });
         }
 
+
         [HttpGet("me")]
         [Authorize]
         public async Task<IActionResult> GetCurrentUser()
@@ -122,6 +123,24 @@ namespace FYP_Project_II.Controllers
                 role = user.Role,
                 phone = user.Phone
             });
+        }
+
+        [HttpGet("users")]
+        [Authorize]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            var users = _userManager.Users.Select(u => new
+            {
+                id = u.Id,
+                userId = u.UserName,
+                name = u.Name,
+                email = u.Email,
+                phone = u.Phone,
+                role = u.Role,
+                createdAt = u.LockoutEnd // Using LockoutEnd as a placeholder, ideally add CreatedAt to ApplicationUser
+            }).ToList();
+
+            return Ok(users);
         }
 
         [HttpPost("logout")]

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -9,14 +9,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Users, Plus, Clock, Settings, Bell } from 'lucide-react';
-import { mockUsers, mockAuditLogs, mockSystemSettings, mockAnnouncements } from '../lib/mockData';
+import { mockAuditLogs, mockSystemSettings, mockAnnouncements } from '../lib/mockData';
 import { User, UserRole, AuditLog, Announcement } from '../lib/types';
 import { toast } from 'sonner';
+import { authApi } from '../lib/api';
 
 export const AdminManagement = () => {
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [auditLogs] = useState<AuditLog[]>(mockAuditLogs);
   const [announcements, setAnnouncements] = useState<Announcement[]>(mockAnnouncements);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     userId: '',
     password: '',
@@ -26,23 +30,73 @@ export const AdminManagement = () => {
     phone: ''
   });
 
-  const handleCreateUser = () => {
-    const user: User = {
-      id: `${Date.now()}`,
-      ...newUser,
-      createdAt: new Date().toISOString()
+  // Fetch users from database on component mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setIsLoadingUsers(true);
+        const data = await authApi.getAllUsers();
+        setUsers(data);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        toast.error('Failed to load users');
+      } finally {
+        setIsLoadingUsers(false);
+      }
     };
 
-    setUsers(prev => [...prev, user]);
-    setNewUser({
-      userId: '',
-      password: '',
-      name: '',
-      role: 'Emergency Officer',
-      email: '',
-      phone: ''
-    });
-    toast.success('User created successfully');
+    fetchUsers();
+  }, []);
+
+  const handleCreateUser = async () => {
+    setIsCreatingUser(true);
+
+    try {
+      // Call the backend API to create user
+      await authApi.register({
+        userId: newUser.userId,
+        password: newUser.password,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role
+      });
+
+      // Only refresh if registration succeeded
+      const updatedUsers = await authApi.getAllUsers();
+      setUsers(updatedUsers);
+
+      // Reset form
+      setNewUser({
+        userId: '',
+        password: '',
+        name: '',
+        role: 'Emergency Officer',
+        email: '',
+        phone: ''
+      });
+
+      // Close dialog and show success message
+      setIsDialogOpen(false);
+      toast.success('User created successfully and saved to database');
+    } catch (error) {
+      // Handle errors - DO NOT refresh user list on error
+      let errorMessage = 'Failed to create user';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Provide helpful hints for common errors
+        if (errorMessage.includes('password') || errorMessage.includes('Password')) {
+          errorMessage += '\n\nPassword must have:\n• At least 6 characters\n• Uppercase letter (A-Z)\n• Lowercase letter (a-z)\n• Number (0-9)';
+        }
+      }
+
+      toast.error(errorMessage);
+      console.error('Error creating user:', error);
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const getRoleBadgeColor = (role: UserRole) => {
@@ -119,7 +173,7 @@ export const AdminManagement = () => {
                   <CardTitle>User Accounts</CardTitle>
                   <CardDescription>Manage system user accounts and roles</CardDescription>
                 </div>
-                <Dialog>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="gap-2">
                       <Plus className="h-4 w-4" />
@@ -137,8 +191,9 @@ export const AdminManagement = () => {
                           <Label>User ID *</Label>
                           <Input
                             value={newUser.userId}
-                            onChange={(e) => setNewUser({...newUser, userId: e.target.value})}
+                            onChange={(e) => setNewUser({ ...newUser, userId: e.target.value })}
                             placeholder="officer002"
+                            disabled={isCreatingUser}
                           />
                         </div>
                         <div className="space-y-2">
@@ -146,22 +201,31 @@ export const AdminManagement = () => {
                           <Input
                             type="password"
                             value={newUser.password}
-                            onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                             placeholder="********"
+                            disabled={isCreatingUser}
                           />
+                          <p className="text-xs text-gray-500">
+                            Min 6 chars, must include uppercase, lowercase, and number
+                          </p>
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Full Name *</Label>
                         <Input
                           value={newUser.name}
-                          onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                          onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                           placeholder="Enter full name"
+                          disabled={isCreatingUser}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>Role *</Label>
-                        <Select value={newUser.role} onValueChange={(value) => setNewUser({...newUser, role: value as UserRole})}>
+                        <Select
+                          value={newUser.role}
+                          onValueChange={(value) => setNewUser({ ...newUser, role: value as UserRole })}
+                          disabled={isCreatingUser}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -179,25 +243,27 @@ export const AdminManagement = () => {
                           <Input
                             type="email"
                             value={newUser.email}
-                            onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                             placeholder="email@daecs.gov.my"
+                            disabled={isCreatingUser}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Phone *</Label>
                           <Input
                             value={newUser.phone}
-                            onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
+                            onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
                             placeholder="+60..."
+                            disabled={isCreatingUser}
                           />
                         </div>
                       </div>
                       <Button
                         onClick={handleCreateUser}
                         className="w-full"
-                        disabled={!newUser.userId || !newUser.password || !newUser.name || !newUser.email || !newUser.phone}
+                        disabled={!newUser.userId || !newUser.password || !newUser.name || !newUser.email || !newUser.phone || isCreatingUser}
                       >
-                        Create User Account
+                        {isCreatingUser ? 'Creating User...' : 'Create User Account'}
                       </Button>
                     </div>
                   </DialogContent>
@@ -327,8 +393,8 @@ export const AdminManagement = () => {
                           </Badge>
                           <Badge className={
                             announcement.priority === 'High' ? 'bg-red-100 text-red-800' :
-                            announcement.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
+                              announcement.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                           }>
                             {announcement.priority}
                           </Badge>

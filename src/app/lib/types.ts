@@ -4,7 +4,7 @@ export type UserRole = 'Admin' | 'Emergency Officer' | 'Shelter Manager' | 'Reso
 export interface User {
   id: string;
   userId: string;
-  password: string;
+  password?: string; // Optional - not returned from API for security
   name: string;
   role: UserRole;
   email: string;

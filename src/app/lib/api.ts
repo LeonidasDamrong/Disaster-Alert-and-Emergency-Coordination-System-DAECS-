@@ -1,7 +1,9 @@
 // API Configuration
 const API_BASE_URL = import.meta.env.MODE === 'production'
     ? '' // Production: same origin
-    : 'http://localhost:5000'; // Development: ASP.NET Core dev server
+    : 'http://localhost:5191'; // Development: ASP.NET Core dev server
+
+import type { UserRole } from './types';
 
 // API Client with JWT token support
 class ApiClient {
@@ -85,6 +87,17 @@ export const authApi = {
             role: string;
             phone: string;
         }>('/api/account/me'),
+
+    getAllUsers: () =>
+        apiClient.get<Array<{
+            id: string;
+            userId: string;
+            name: string;
+            email: string;
+            phone: string;
+            role: UserRole;
+            createdAt: string;
+        }>>('/api/account/users'),
 
     logout: () => apiClient.post<{ message: string }>('/api/account/logout'),
 };
