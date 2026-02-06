@@ -113,6 +113,9 @@ app.UseAuthorization();
 //     name: "default",
 //     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+// Enable API controllers (for /api/* endpoints)
+app.MapControllers();
+
 app.MapRazorPages();
 
 // SPA fallback for React Router - catch all routes and serve index
