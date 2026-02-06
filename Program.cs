@@ -108,14 +108,15 @@ app.UseCors("AllowReactApp");
 app.UseAuthentication(); // Important: Must come before UseAuthorization
 app.UseAuthorization();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+// Commented out: This was conflicting with SPA fallback and serving the old MVC view
+// app.MapControllerRoute(
+//     name: "default",
+//     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapRazorPages();
 
 // SPA fallback for React Router - catch all routes and serve index
-app.MapFallbackToController("Index", "Home");
+app.MapFallbackToFile("index.html");
 
 // Apply migrations and seed database
 using (var scope = app.Services.CreateScope())

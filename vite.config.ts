@@ -12,11 +12,11 @@ export default defineConfig({
     base: '/',
     root: '.',
     build: {
-        outDir: 'wwwroot/dist',
+        outDir: 'wwwroot',
         emptyOutDir: true,
         rollupOptions: {
             input: {
-                main: './index.html'
+                main: 'index.html'
             }
         }
     },
