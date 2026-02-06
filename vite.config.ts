@@ -9,6 +9,7 @@ export default defineConfig({
         react(),
         tailwindcss(),
     ],
+    base: '/',
     root: '.',
     build: {
         outDir: 'wwwroot/dist',
