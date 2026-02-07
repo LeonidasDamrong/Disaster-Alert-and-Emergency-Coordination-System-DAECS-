@@ -1,5 +1,5 @@
 // User and Authentication Types
-export type UserRole = 'Admin' | 'Emergency Officer' | 'Shelter Manager' | 'Resource Manager';
+export type UserRole = 'Admin' | 'Emergency Officer' | 'Shelter Manager' | 'Resource Manager' | 'Disaster Manager';
 
 export interface User {
   id: string;

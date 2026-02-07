@@ -17,7 +17,7 @@ if ($confirmation -ne "RESET") {
 }
 
 Write-Host ""
-Write-Host "Dropping database..." -ForegroundColor Yellow
+Write-Host "Dropping existing database..." -ForegroundColor Yellow
 dotnet ef database drop --force
 
 Write-Host ""

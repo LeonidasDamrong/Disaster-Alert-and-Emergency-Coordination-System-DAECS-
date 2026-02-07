@@ -145,7 +145,7 @@ using (var scope = app.Services.CreateScope())
 
         // Seed initial users and roles
         logger.LogInformation("Starting user and role seeding...");
-        await DbInitializer.SeedUsersAsync(userManager, roleManager);
+        await DbInitializer.SeedUsersAsync(userManager, roleManager, dbContext);
         logger.LogInformation("Database seeding completed");
     }
     catch (Exception ex)

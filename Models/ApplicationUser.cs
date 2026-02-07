@@ -8,5 +8,6 @@ namespace FYP_Project_II.Models
         public string Name { get; set; } = string.Empty;
         // PhoneNumber is inherited from IdentityUser
         // Role is managed through AspNetRoles and AspNetUserRoles tables
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

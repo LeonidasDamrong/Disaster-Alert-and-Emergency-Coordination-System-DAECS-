@@ -54,6 +54,17 @@ class ApiClient {
             body: data ? JSON.stringify(data) : undefined,
         });
     }
+
+    async put<T>(endpoint: string, data?: unknown): Promise<T> {
+        return this.request<T>(endpoint, {
+            method: 'PUT',
+            body: data ? JSON.stringify(data) : undefined,
+        });
+    }
+
+    async delete<T>(endpoint: string): Promise<T> {
+        return this.request<T>(endpoint, { method: 'DELETE' });
+    }
 }
 
 export const apiClient = new ApiClient();
@@ -99,5 +110,30 @@ export const authApi = {
             createdAt: string;
         }>>('/api/account/users'),
 
+    getRoles: () =>
+        apiClient.get<string[]>('/api/account/roles'),
+
+    getNextUserId: (role: string) =>
+        apiClient.get<{ nextUserId: string }>(`/api/account/next-user-id?role=${encodeURIComponent(role)}`),
+
+    updateUser: (userId: string, data: { name: string; email: string; phone: string }) =>
+        apiClient.put<{ message: string }>(`/api/account/users/${encodeURIComponent(userId)}`, data),
+
+    deleteUser: (userId: string) =>
+        apiClient.delete<{ message: string }>(`/api/account/users/${encodeURIComponent(userId)}`),
+
     logout: () => apiClient.post<{ message: string }>('/api/account/logout'),
+};
+
+export const auditLogApi = {
+    getAuditLogs: () =>
+        apiClient.get<Array<{
+            id: string;
+            userId: string;
+            userName: string;
+            action: string;
+            module: string;
+            details: string;
+            timestamp: string;
+        }>>('/api/auditlog'),
 };
