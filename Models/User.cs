@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Identity;
+
 namespace FYP_Project_II.Models
 {
     /// <summary>
@@ -36,38 +38,57 @@ namespace FYP_Project_II.Models
         }
 
         // Methods
-        public virtual bool Login()
+        /// <summary>
+        /// Validates credentials against the identity store via UserManager and SignInManager.
+        /// Returns the ApplicationUser and role on success, or (null, null) on failure.
+        /// </summary>
+        public virtual async Task<(ApplicationUser? User, string? Role)> LoginAsync(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager)
         {
-            // TODO: Implement login logic
-            // This would typically validate credentials against a database
-            Console.WriteLine($"User {Username} attempting to login...");
-            return true;
+            if (userManager == null)
+                throw new ArgumentNullException(nameof(userManager));
+            if (signInManager == null)
+                throw new ArgumentNullException(nameof(signInManager));
+
+            var appUser = await userManager.FindByNameAsync(UserId);
+            if (appUser == null)
+                return (null, null);
+
+            var result = await signInManager.CheckPasswordSignInAsync(appUser, Password, lockoutOnFailure: false);
+            if (!result.Succeeded)
+                return (null, null);
+
+            var roles = await userManager.GetRolesAsync(appUser);
+            var role = roles.FirstOrDefault() ?? "User";
+
+            return (appUser, role);
         }
 
-        public virtual void Logout()
+        /// <summary>
+        /// Signs out the current user via SignInManager.
+        /// With JWT, the client must also remove the token; this clears any server-side sign-in state.
+        /// </summary>
+        public virtual async Task LogoutAsync(SignInManager<ApplicationUser> signInManager)
         {
-            // TODO: Implement logout logic
-            // This would typically clear session/authentication tokens
-            Console.WriteLine($"User {Username} logged out successfully.");
+            if (signInManager == null)
+                throw new ArgumentNullException(nameof(signInManager));
+
+            await signInManager.SignOutAsync();
         }
 
-        public virtual bool ChangePassword(string oldPassword, string newPassword)
-        {
-            // TODO: Implement password change logic
-            // This would typically validate old password and update with new one
-            if (Password == oldPassword)
-            {
-                Password = newPassword;
-                Console.WriteLine("Password changed successfully.");
-                return true;
-            }
-            Console.WriteLine("Old password is incorrect.");
-            return false;
-        }
-
-        public virtual string GetRole()
-        {
-            return Role;
-        }
+        // public virtual bool ChangePassword(string oldPassword, string newPassword)
+        // {
+        //     // TODO: Implement password change logic
+        //     // This would typically validate old password and update with new one
+        //     if (Password == oldPassword)
+        //     {
+        //         Password = newPassword;
+        //         Console.WriteLine("Password changed successfully.");
+        //         return true;
+        //     }
+        //     Console.WriteLine("Old password is incorrect.");
+        //     return false;
+        // }
     }
 }

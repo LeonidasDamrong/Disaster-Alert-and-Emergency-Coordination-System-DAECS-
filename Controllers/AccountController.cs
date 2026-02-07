@@ -36,35 +36,31 @@ namespace FYP_Project_II.Controllers
                 return BadRequest(new { message = "User ID and password are required" });
             }
 
-            // Find user by UserName (we'll use UserName field to store userId)
-            var user = await _userManager.FindByNameAsync(request.UserId);
-            if (user == null)
+            // Route login through User model
+            var user = new User
+            {
+                UserId = request.UserId,
+                Password = request.Password
+            };
+
+            var (appUser, role) = await user.LoginAsync(_userManager, _signInManager);
+
+            if (appUser == null || role == null)
             {
                 return Unauthorized(new { message = "Invalid User ID or Password" });
             }
-
-            // Check password
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
-            if (!result.Succeeded)
-            {
-                return Unauthorized(new { message = "Invalid User ID or Password" });
-            }
-
-            // Get user roles
-            var roles = await _userManager.GetRolesAsync(user);
-            var role = roles.FirstOrDefault() ?? "User"; // Get first role or default
 
             // Generate JWT token
-            var token = GenerateJwtToken(user, role);
+            var token = GenerateJwtToken(appUser, role);
 
             return Ok(new LoginResponse
             {
                 Token = token,
-                UserId = user.UserName ?? string.Empty,
-                Name = user.Name,
-                Email = user.Email ?? string.Empty,
+                UserId = appUser.UserName ?? string.Empty,
+                Name = appUser.Name,
+                Email = appUser.Email ?? string.Empty,
                 Role = role,
-                Phone = user.PhoneNumber ?? string.Empty
+                Phone = appUser.PhoneNumber ?? string.Empty
             });
         }
 
@@ -224,9 +220,19 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpPost("logout")]
-        public IActionResult Logout()
+        [Authorize]
+        public async Task<IActionResult> Logout()
         {
-            // With JWT, logout is handled client-side by removing the token
+            var userId = User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Ok(new { message = "Logged out successfully" });
+            }
+
+            // Route logout through User model
+            var user = new User { UserId = userId };
+            await user.LogoutAsync(_signInManager);
+
             return Ok(new { message = "Logged out successfully" });
         }
 
