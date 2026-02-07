@@ -41,6 +41,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     options.Password.RequireNonAlphanumeric = false; // Changed to false for easier testing
     options.Password.RequiredLength = 6; // Minimum 6 characters
 })
+.AddRoles<IdentityRole>() // Add role management
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddSignInManager<SignInManager<ApplicationUser>>();
 
@@ -131,6 +132,7 @@ using (var scope = app.Services.CreateScope())
     {
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
         logger.LogInformation("Starting database initialization...");
 
@@ -141,9 +143,9 @@ using (var scope = app.Services.CreateScope())
             logger.LogInformation("Migrations applied successfully");
         }
 
-        // Seed initial users
-        logger.LogInformation("Starting user seeding...");
-        await DbInitializer.SeedUsersAsync(userManager);
+        // Seed initial users and roles
+        logger.LogInformation("Starting user and role seeding...");
+        await DbInitializer.SeedUsersAsync(userManager, roleManager);
         logger.LogInformation("Database seeding completed");
     }
     catch (Exception ex)

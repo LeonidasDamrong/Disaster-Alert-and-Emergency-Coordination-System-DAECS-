@@ -4,8 +4,9 @@ namespace FYP_Project_II.Models
 {
     public class ApplicationUser : IdentityUser
     {
+        // Common properties for all users
         public string Name { get; set; } = string.Empty;
-        public string Phone { get; set; } = string.Empty;
-        public string Role { get; set; } = string.Empty;
+        // PhoneNumber is inherited from IdentityUser
+        // Role is managed through AspNetRoles and AspNetUserRoles tables
     }
 }

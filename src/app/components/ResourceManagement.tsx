@@ -1,14 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Package, CheckCircle, XCircle, Truck, Printer } from 'lucide-react';
+import { CheckCircle, XCircle, Truck, Printer } from 'lucide-react';
 import { mockResources, mockResourceRequests } from '../lib/mockData';
 import { ResourceRequest, ResourceStatus, UrgencyLevel } from '../lib/types';
 import { toast } from 'sonner';

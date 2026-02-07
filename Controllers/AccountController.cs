@@ -50,8 +50,12 @@ namespace FYP_Project_II.Controllers
                 return Unauthorized(new { message = "Invalid User ID or Password" });
             }
 
+            // Get user roles
+            var roles = await _userManager.GetRolesAsync(user);
+            var role = roles.FirstOrDefault() ?? "User"; // Get first role or default
+
             // Generate JWT token
-            var token = GenerateJwtToken(user);
+            var token = GenerateJwtToken(user, role);
 
             return Ok(new LoginResponse
             {
@@ -59,8 +63,8 @@ namespace FYP_Project_II.Controllers
                 UserId = user.UserName ?? string.Empty,
                 Name = user.Name,
                 Email = user.Email ?? string.Empty,
-                Role = user.Role,
-                Phone = user.Phone
+                Role = role,
+                Phone = user.PhoneNumber ?? string.Empty
             });
         }
 
@@ -79,23 +83,88 @@ namespace FYP_Project_II.Controllers
                 return BadRequest(new { message = "User ID already exists" });
             }
 
-            // Create new user
-            var user = new ApplicationUser
+            // Get the current logged-in user (should be an Admin)
+            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            ApplicationUser? currentAppUser = null;
+            
+            if (!string.IsNullOrEmpty(currentUserId))
             {
-                UserName = request.UserId,
-                Email = request.Email,
-                Name = request.Name,
-                Phone = request.Phone,
-                Role = request.Role
-            };
-
-            var result = await _userManager.CreateAsync(user, request.Password);
-            if (!result.Succeeded)
-            {
-                return BadRequest(new { message = "Failed to create user", errors = result.Errors });
+                currentAppUser = await _userManager.FindByIdAsync(currentUserId);
             }
 
-            return Ok(new { message = "User registered successfully" });
+            // Create Admin object (either from current user or a system admin for self-registration)
+            var admin = new Admin
+            {
+                UserId = currentAppUser?.UserName ?? "system",
+                Username = currentAppUser?.Name ?? "System Administrator",
+                Email = currentAppUser?.Email ?? "system@daecs.com",
+                PhoneNo = currentAppUser?.PhoneNumber ?? "",
+                Password = "" // Not needed for admin object
+            };
+
+            // Create the appropriate User object based on role
+            // All users have same properties, only methods differ
+            User newUser = request.Role switch
+            {
+                "Admin" => new Admin(
+                    request.UserId,
+                    request.Name,
+                    request.Password,
+                    request.Phone,
+                    request.Email,
+                    "Standard" // AdminLevel parameter
+                ),
+                "Shelter Manager" => new ShelterManager(
+                    request.UserId,
+                    request.Name,
+                    request.Password,
+                    request.Phone,
+                    request.Email,
+                    "", // ShelterId - not stored, only methods differ
+                    "", // ShelterLocation
+                    0   // MaxCapacity
+                ),
+                "Resource Manager" => new ResourceManager(
+                    request.UserId,
+                    request.Name,
+                    request.Password,
+                    request.Phone,
+                    request.Email,
+                    "", // WarehouseId
+                    ""  // WarehouseLocation
+                ),
+                "Emergency Officer" => new FirstResponder(
+                    request.UserId,
+                    request.Name,
+                    request.Password,
+                    request.Phone,
+                    request.Email,
+                    "General" // Specialization
+                ),
+                "Disaster Manager" => new DisasterManager(
+                    request.UserId,
+                    request.Name,
+                    request.Password,
+                    request.Phone,
+                    request.Email,
+                    "" // AssignedRegion
+                ),
+                _ => throw new ArgumentException($"Invalid role: {request.Role}")
+            };
+
+            // Use Admin's CreateUser method
+            var (success, message, createdUser) = await admin.CreateUser(newUser, _userManager);
+
+            if (success && createdUser != null)
+            {
+                // Assign role to the newly created user
+                await _userManager.AddToRoleAsync(createdUser, request.Role);
+                return Ok(new { message });
+            }
+            else
+            {
+                return BadRequest(new { message });
+            }
         }
 
 
@@ -115,32 +184,43 @@ namespace FYP_Project_II.Controllers
                 return NotFound();
             }
 
+            // Get user roles
+            var roles = await _userManager.GetRolesAsync(user);
+            var role = roles.FirstOrDefault() ?? "User";
+
             return Ok(new
             {
                 userId = user.UserName,
                 name = user.Name,
                 email = user.Email,
-                role = user.Role,
-                phone = user.Phone
+                role = role,
+                phone = user.PhoneNumber
             });
         }
 
         [HttpGet("users")]
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllUsers()
         {
-            var users = _userManager.Users.Select(u => new
+            var users = _userManager.Users.ToList();
+            
+            var userList = new List<object>();
+            foreach (var u in users)
             {
-                id = u.Id,
-                userId = u.UserName,
-                name = u.Name,
-                email = u.Email,
-                phone = u.Phone,
-                role = u.Role,
-                createdAt = u.LockoutEnd // Using LockoutEnd as a placeholder, ideally add CreatedAt to ApplicationUser
-            }).ToList();
-
-            return Ok(users);
+                var roles = await _userManager.GetRolesAsync(u);
+                var role = roles.FirstOrDefault() ?? "User";
+                
+                userList.Add(new
+                {
+                    userId = u.UserName,
+                    name = u.Name,
+                    email = u.Email,
+                    role = role,
+                    phone = u.PhoneNumber
+                });
+            }
+            
+            return Ok(userList);
         }
 
         [HttpPost("logout")]
@@ -150,7 +230,7 @@ namespace FYP_Project_II.Controllers
             return Ok(new { message = "Logged out successfully" });
         }
 
-        private string GenerateJwtToken(ApplicationUser user)
+        private string GenerateJwtToken(ApplicationUser user, string role)
         {
             var jwtSettings = _configuration.GetSection("Jwt");
             var key = Encoding.ASCII.GetBytes(jwtSettings["Key"] ?? throw new InvalidOperationException("JWT Key not configured"));
@@ -162,9 +242,9 @@ namespace FYP_Project_II.Controllers
                     new Claim(ClaimTypes.NameIdentifier, user.Id),
                     new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                     new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                    new Claim(ClaimTypes.Role, user.Role),
+                    new Claim(ClaimTypes.Role, role),
                     new Claim("Name", user.Name),
-                    new Claim("Phone", user.Phone)
+                    new Claim("Phone", user.PhoneNumber ?? string.Empty)
                 }),
                 Expires = DateTime.UtcNow.AddHours(double.Parse(jwtSettings["ExpiryInHours"] ?? "24")),
                 Issuer = jwtSettings["Issuer"],

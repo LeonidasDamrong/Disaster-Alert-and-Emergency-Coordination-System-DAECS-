@@ -5,8 +5,23 @@ namespace FYP_Project_II.Data
 {
     public static class DbInitializer
     {
-        public static async Task SeedUsersAsync(UserManager<ApplicationUser> userManager)
+        public static async Task SeedUsersAsync(
+            UserManager<ApplicationUser> userManager,
+            RoleManager<IdentityRole> roleManager)
         {
+            // Define all roles
+            string[] roleNames = { "Admin", "Emergency Officer", "Shelter Manager", "Resource Manager", "Disaster Manager" };
+
+            // Create roles if they don't exist
+            foreach (var roleName in roleNames)
+            {
+                if (!await roleManager.RoleExistsAsync(roleName))
+                {
+                    await roleManager.CreateAsync(new IdentityRole(roleName));
+                    Console.WriteLine($"Created role: {roleName}");
+                }
+            }
+
             // Check if users already exist
             if (userManager.Users.Any())
             {
@@ -14,75 +29,61 @@ namespace FYP_Project_II.Data
             }
 
             // Seed users from mock data
-            var users = new[]
+            var usersWithRoles = new[]
             {
-                new ApplicationUser
+                new { User = new ApplicationUser
                 {
                     UserName = "admin001",
                     Email = "ahmad@daecs.gov.my",
                     Name = "Ahmad bin Abdullah",
-                    Phone = "+60123456789",
-                    Role = "Admin",
+                    PhoneNumber = "+60123456789",
                     EmailConfirmed = true
-                },
-                new ApplicationUser
+                }, Role = "Admin", Password = "Admin@123" },
+                
+                new { User = new ApplicationUser
                 {
                     UserName = "officer001",
                     Email = "siti@daecs.gov.my",
                     Name = "Siti Nurhaliza",
-                    Phone = "+60123456790",
-                    Role = "Emergency Officer",
+                    PhoneNumber = "+60123456790",
                     EmailConfirmed = true
-                },
-                new ApplicationUser
+                }, Role = "Emergency Officer", Password = "Officer@123" },
+                
+                new { User = new ApplicationUser
                 {
                     UserName = "shelter001",
                     Email = "kumar@daecs.gov.my",
                     Name = "Kumar Rajendran",
-                    Phone = "+60123456791",
-                    Role = "Shelter Manager",
+                    PhoneNumber = "+60123456791",
                     EmailConfirmed = true
-                },
-                new ApplicationUser
+                }, Role = "Shelter Manager", Password = "Shelter@123" },
+                
+                new { User = new ApplicationUser
                 {
                     UserName = "resource001",
                     Email = "tan@daecs.gov.my",
                     Name = "Tan Mei Ling",
-                    Phone = "+60123456792",
-                    Role = "Resource Manager",
+                    PhoneNumber = "+60123456792",
                     EmailConfirmed = true
-                }
+                }, Role = "Resource Manager", Password = "Resource@123" }
             };
 
-            foreach (var user in users)
+            foreach (var item in usersWithRoles)
             {
-                // Create user with password based on role
-                string password = GetPasswordForRole(user.Role);
-                var result = await userManager.CreateAsync(user, password);
+                // Create user
+                var result = await userManager.CreateAsync(item.User, item.Password);
 
                 if (result.Succeeded)
                 {
-                    Console.WriteLine($"Created user: {user.UserName}");
+                    // Assign role to user
+                    await userManager.AddToRoleAsync(item.User, item.Role);
+                    Console.WriteLine($"Created user: {item.User.UserName} with role: {item.Role}");
                 }
                 else
                 {
-                    Console.WriteLine($"Failed to create user {user.UserName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                    Console.WriteLine($"Failed to create user {item.User.UserName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
                 }
             }
-        }
-
-        private static string GetPasswordForRole(string role)
-        {
-            // Simple password pattern: RoleName@123
-            // In production, these should be more secure and stored securely
-            return role switch
-            {
-                "Admin" => "Admin@123",
-                "Emergency Officer" => "Officer@123",
-                "Shelter Manager" => "Shelter@123",
-                "Resource Manager" => "Resource@123",
-                _ => "Default@123"
-            };
         }
     }
 }
