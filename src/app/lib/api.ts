@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.MODE === 'production'
     ? '' // Production: same origin
     : 'http://localhost:5191'; // Development: ASP.NET Core dev server
 
-import type { UserRole } from './types';
+import type { UserRole, SystemSettings, Announcement } from './types';
 
 // API Client with JWT token support
 class ApiClient {
@@ -33,6 +33,10 @@ class ApiClient {
             if (!response.ok) {
                 const error = await response.json().catch(() => ({ message: 'Request failed' }));
                 throw new Error(error.message || `HTTP ${response.status}`);
+            }
+
+            if (response.status === 204) {
+                return {} as T;
             }
 
             return await response.json();
@@ -129,11 +133,23 @@ export const auditLogApi = {
     getAuditLogs: () =>
         apiClient.get<Array<{
             id: string;
-            userId: string;
-            userName: string;
+            username: string;
+            name: string;
             action: string;
             module: string;
             details: string;
             timestamp: string;
         }>>('/api/auditlog'),
+};
+
+export const systemSettingsApi = {
+    getSettings: () => apiClient.get<SystemSettings>('/api/system-settings'),
+    updateSettings: (settings: SystemSettings) => apiClient.put<void>('/api/system-settings', settings),
+};
+
+export const announcementApi = {
+    getAll: () => apiClient.get<Announcement[]>('/api/announcements'),
+    create: (announcement: Partial<Announcement>) => apiClient.post<Announcement>('/api/announcements', announcement),
+    update: (id: string, announcement: Partial<Announcement>) => apiClient.put<void>(`/api/announcements/${id}`, announcement),
+    delete: (id: string) => apiClient.delete<void>(`/api/announcements/${id}`)
 };

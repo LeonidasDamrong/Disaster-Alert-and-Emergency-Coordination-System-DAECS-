@@ -14,10 +14,10 @@ export const mockUsers: User[] = [
   },
   {
     id: '2',
-    userId: 'officer001',
-    password: 'officer123',
+    userId: 'responder001',
+    password: 'responder123',
     name: 'Siti Nurhaliza',
-    role: 'Emergency Officer',
+    role: 'First Responder',
     email: 'siti@daecs.gov.my',
     phone: '+60123456790',
     createdAt: '2024-01-15T08:00:00Z'
@@ -70,7 +70,7 @@ export const mockSOSRequests: SOS[] = [
     description: 'Medical emergency - elderly person needs medication and evacuation',
     urgency: 'High',
     status: 'In Progress',
-    assignedOfficer: 'Siti Nurhaliza',
+    assignedResponder: 'Siti Nurhaliza',
     createdAt: '2024-12-19T09:15:00Z',
     updatedAt: '2024-12-19T10:00:00Z',
     notes: [
@@ -92,7 +92,7 @@ export const mockSOSRequests: SOS[] = [
     description: 'Landslide blocking road access, need evacuation',
     urgency: 'Medium',
     status: 'In Progress',
-    assignedOfficer: 'Ahmad bin Abdullah',
+    assignedResponder: 'Ahmad bin Abdullah',
     createdAt: '2024-12-19T08:45:00Z',
     updatedAt: '2024-12-19T09:30:00Z',
     notes: [
@@ -114,7 +114,7 @@ export const mockSOSRequests: SOS[] = [
     description: 'Lost contact with family members during evacuation',
     urgency: 'Low',
     status: 'Completed',
-    assignedOfficer: 'Siti Nurhaliza',
+    assignedResponder: 'Siti Nurhaliza',
     createdAt: '2024-12-18T14:20:00Z',
     updatedAt: '2024-12-19T08:00:00Z',
     notes: [
@@ -356,17 +356,17 @@ export const mockResourceRequests: ResourceRequest[] = [
 export const mockAuditLogs: AuditLog[] = [
   {
     id: 'LOG001',
-    userId: '1',
-    userName: 'Ahmad bin Abdullah',
+    username: 'admin001',
+    name: 'Ahmad bin Abdullah',
     action: 'Create User',
     module: 'Admin Management',
-    details: 'Created new user: officer002',
+    details: 'Created new user: responder002',
     timestamp: '2024-12-19T10:30:00Z'
   },
   {
     id: 'LOG002',
-    userId: '2',
-    userName: 'Siti Nurhaliza',
+    username: 'responder001',
+    name: 'Siti Nurhaliza',
     action: 'Update SOS Status',
     module: 'SOS Monitoring',
     details: 'Changed SOS002 status from New to In Progress',
@@ -374,8 +374,8 @@ export const mockAuditLogs: AuditLog[] = [
   },
   {
     id: 'LOG003',
-    userId: '1',
-    userName: 'Ahmad bin Abdullah',
+    username: 'admin001',
+    name: 'Ahmad bin Abdullah',
     action: 'Send Alert',
     module: 'Alert Broadcasting',
     details: 'Broadcast emergency alert: ALERT002',
@@ -383,8 +383,8 @@ export const mockAuditLogs: AuditLog[] = [
   },
   {
     id: 'LOG004',
-    userId: '3',
-    userName: 'Kumar Rajendran',
+    username: 'shelter001',
+    name: 'Kumar Rajendran',
     action: 'Register Evacuee',
     module: 'Shelter Management',
     details: 'Registered evacuee EV001 at SHELTER001',
@@ -392,8 +392,8 @@ export const mockAuditLogs: AuditLog[] = [
   },
   {
     id: 'LOG005',
-    userId: '4',
-    userName: 'Tan Mei Ling',
+    username: 'resource001',
+    name: 'Tan Mei Ling',
     action: 'Approve Resource Request',
     module: 'Resource Management',
     details: 'Approved request REQ002 and assigned to Team Alpha',
@@ -418,7 +418,7 @@ export const mockAnnouncements: Announcement[] = [
     title: 'System Maintenance Scheduled',
     content: 'System will undergo maintenance on 25th December 2024 from 02:00 AM to 04:00 AM.',
     priority: 'Medium',
-    active: true,
+    isActive: true,
     createdBy: 'Ahmad bin Abdullah',
     createdAt: '2024-12-15T10:00:00Z',
     expiresAt: '2024-12-26T00:00:00Z'
@@ -426,9 +426,9 @@ export const mockAnnouncements: Announcement[] = [
   {
     id: 'ANN002',
     title: 'New Emergency Protocol',
-    content: 'Updated emergency response protocols effective immediately. All officers please review the new guidelines.',
+    content: 'Updated emergency response protocols effective immediately. All responders please review the new guidelines.',
     priority: 'High',
-    active: true,
+    isActive: true,
     createdBy: 'Ahmad bin Abdullah',
     createdAt: '2024-12-10T08:00:00Z'
   }

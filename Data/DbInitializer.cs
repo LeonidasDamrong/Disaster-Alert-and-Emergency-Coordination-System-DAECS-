@@ -12,7 +12,7 @@ namespace FYP_Project_II.Data
             ApplicationDbContext dbContext)
         {
             // Define all roles
-            string[] roleNames = { "Admin", "Emergency Officer", "Shelter Manager", "Resource Manager", "Disaster Manager" };
+            string[] roleNames = { "System Admin", "Admin", "First Responder", "Shelter Manager", "Resource Manager", "Disaster Manager" };
 
             // Create roles if they don't exist
             foreach (var roleName in roleNames)
@@ -42,7 +42,7 @@ namespace FYP_Project_II.Data
                 var result = await userManager.CreateAsync(sysAdminUser, "System@123");
                 if (result.Succeeded)
                 {
-                    await userManager.AddToRoleAsync(sysAdminUser, "Admin");
+                    await userManager.AddToRoleAsync(sysAdminUser, "System Admin");
                     Console.WriteLine("Created system admin: systemadmin");
                 }
             }
@@ -69,13 +69,13 @@ namespace FYP_Project_II.Data
                 }, Role = "Admin", Password = "Admin@123" },
                 new { User = new ApplicationUser
                 {
-                    UserName = "officer001",
+                    UserName = "responder001",
                     Email = "siti@daecs.gov.my",
                     Name = "Siti Nurhaliza",
                     PhoneNumber = "+60123456790",
                     EmailConfirmed = true,
                     CreatedAt = baseDate
-                }, Role = "Emergency Officer", Password = "Officer@123" },
+                }, Role = "First Responder", Password = "Responder@123" },
                 
                 new { User = new ApplicationUser
                 {
@@ -118,20 +118,26 @@ namespace FYP_Project_II.Data
 
         private static async Task SeedAuditLogsIfEmpty(ApplicationDbContext dbContext)
         {
+            Console.WriteLine("Checking if Audit Logs need seeding...");
             if (!dbContext.AuditLogs.Any())
             {
+                Console.WriteLine("AuditLogs table is empty. Seeding...");
                 var auditLogs = new[]
                 {
-                    new AuditLog { UserId = "admin001", UserName = "Ahmad bin Abdullah", Action = "Create User", Module = "Admin Management", Details = "Created new user: officer002", Timestamp = new DateTime(2024, 12, 19, 10, 30, 0, DateTimeKind.Utc) },
-                    new AuditLog { UserId = "officer001", UserName = "Siti Nurhaliza", Action = "Update SOS Status", Module = "SOS Monitoring", Details = "Changed SOS002 status from New to In Progress", Timestamp = new DateTime(2024, 12, 19, 10, 0, 0, DateTimeKind.Utc) },
-                    new AuditLog { UserId = "admin001", UserName = "Ahmad bin Abdullah", Action = "Send Alert", Module = "Alert Broadcasting", Details = "Broadcast emergency alert: ALERT002", Timestamp = new DateTime(2024, 12, 19, 10, 15, 0, DateTimeKind.Utc) },
-                    new AuditLog { UserId = "shelter001", UserName = "Kumar Rajendran", Action = "Register Evacuee", Module = "Shelter Management", Details = "Registered evacuee EV001 at SHELTER001", Timestamp = new DateTime(2024, 12, 19, 8, 0, 0, DateTimeKind.Utc) },
-                    new AuditLog { UserId = "resource001", UserName = "Tan Mei Ling", Action = "Approve Resource Request", Module = "Resource Management", Details = "Approved request REQ002 and assigned to Team Alpha", Timestamp = new DateTime(2024, 12, 19, 9, 45, 0, DateTimeKind.Utc) }
+                    new AuditLog { Id = "LOG001", Username = "admin001", Name = "Ahmad bin Abdullah", Action = "Create User", Module = "Admin Management", Details = "Created new user: responder002", Timestamp = new DateTime(2024, 12, 19, 10, 30, 0, DateTimeKind.Utc) },
+                    new AuditLog { Id = "LOG002", Username = "responder001", Name = "Siti Nurhaliza", Action = "Update SOS Status", Module = "SOS Monitoring", Details = "Changed SOS002 status from New to In Progress", Timestamp = new DateTime(2024, 12, 19, 10, 0, 0, DateTimeKind.Utc) },
+                    new AuditLog { Id = "LOG003", Username = "admin001", Name = "Ahmad bin Abdullah", Action = "Send Alert", Module = "Alert Broadcasting", Details = "Broadcast emergency alert: ALERT002", Timestamp = new DateTime(2024, 12, 19, 10, 15, 0, DateTimeKind.Utc) },
+                    new AuditLog { Id = "LOG004", Username = "shelter001", Name = "Kumar Rajendran", Action = "Register Evacuee", Module = "Shelter Management", Details = "Registered evacuee EV001 at SHELTER001", Timestamp = new DateTime(2024, 12, 19, 8, 0, 0, DateTimeKind.Utc) },
+                    new AuditLog { Id = "LOG005", Username = "resource001", Name = "Tan Mei Ling", Action = "Approve Resource Request", Module = "Resource Management", Details = "Approved request REQ002 and assigned to Team Alpha", Timestamp = new DateTime(2024, 12, 19, 9, 45, 0, DateTimeKind.Utc) }
                 };
 
                 await dbContext.AuditLogs.AddRangeAsync(auditLogs);
                 await dbContext.SaveChangesAsync();
-                Console.WriteLine("Seeded audit logs");
+                Console.WriteLine($"Seeded {auditLogs.Length} audit logs successfully.");
+            }
+            else
+            {
+                Console.WriteLine("AuditLogs table already has data. Skipping.");
             }
         }
 
@@ -188,9 +194,9 @@ namespace FYP_Project_II.Data
             {
                 var announcements = new[]
                 {
-                    new Announcement { AnnouncementId = "ANN001", Title = "Flood Warning", Content = "Heavy rain expected in Klang Valley.", Severity = "High", Status = "Active", CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new Announcement { AnnouncementId = "ANN002", Title = "Shelter Opening", Content = "Dewan Serbaguna Ampang is now open for evacuees.", Severity = "Medium", Status = "Active", CreatedAt = baseDate.AddHours(1), UpdatedAt = baseDate.AddHours(1) },
-                    new Announcement { AnnouncementId = "ANN003", Title = "Donation Drive", Content = "Collecting dry food and blankets.", Severity = "Low", Status = "Active", CreatedAt = baseDate.AddDays(-1), UpdatedAt = baseDate.AddDays(-1) }
+                    new Announcement { Id = "ANN001", Title = "Flood Warning", Content = "Heavy rain expected in Klang Valley.", Priority = "High", IsActive = true, CreatedBy = "System", CreatedAt = baseDate },
+                    new Announcement { Id = "ANN002", Title = "Shelter Opening", Content = "Dewan Serbaguna Ampang is now open for evacuees.", Priority = "Medium", IsActive = true, CreatedBy = "System", CreatedAt = baseDate.AddHours(1) },
+                    new Announcement { Id = "ANN003", Title = "Donation Drive", Content = "Collecting dry food and blankets.", Priority = "Low", IsActive = true, CreatedBy = "System", CreatedAt = baseDate.AddDays(-1) }
                 };
                 await dbContext.Announcements.AddRangeAsync(announcements);
                 Console.WriteLine("Seeded Announcements");
@@ -206,6 +212,21 @@ namespace FYP_Project_II.Data
                 };
                 await dbContext.Alerts.AddRangeAsync(alerts);
                 Console.WriteLine("Seeded Alerts");
+            }
+
+            // Seed System Settings
+            if (!dbContext.SystemSettings.Any())
+            {
+                var settings = new SystemSettings
+                {
+                    SystemName = "DAECS - Disaster Alert and Emergency Coordination System",
+                    OrganizationName = "National Disaster Management Agency",
+                    EmergencyContactNumber = "+60-3-8000-8000",
+                    EnableNotifications = true,
+                    UpdatedAt = baseDate
+                };
+                await dbContext.SystemSettings.AddAsync(settings);
+                Console.WriteLine("Seeded System Settings");
             }
 
             await dbContext.SaveChangesAsync();

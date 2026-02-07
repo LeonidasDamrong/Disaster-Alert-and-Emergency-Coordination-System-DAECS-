@@ -1,19 +1,22 @@
-import React, { ReactNode } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
-import { 
-  ShieldAlert, 
-  LayoutDashboard, 
-  Radio, 
-  AlertTriangle, 
-  Home as HomeIcon, 
+import {
+  ShieldAlert,
+  LayoutDashboard,
+  Radio,
+  AlertTriangle,
+  Home as HomeIcon,
   Package,
   Users,
   LogOut,
   Bell
 } from 'lucide-react';
 import { Badge } from './ui/badge';
+import { systemSettingsApi } from '../lib/api';
+import { SystemSettings } from '../lib/types';
+import { mockSystemSettings } from '../lib/mockData';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -23,6 +26,20 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [settings, setSettings] = useState<SystemSettings>(mockSystemSettings);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await systemSettingsApi.getSettings();
+        setSettings(data);
+      } catch (error) {
+        console.error('Failed to fetch system settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, [location.pathname]); // Re-fetch on navigation to ensure updates are reflected
 
   const handleLogout = () => {
     logout();
@@ -30,15 +47,15 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   };
 
   const navItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['Admin', 'Emergency Officer', 'Shelter Manager', 'Resource Manager'] },
-    { path: '/sos', icon: Radio, label: 'SOS Monitoring', roles: ['Admin', 'Emergency Officer'] },
-    { path: '/alerts', icon: AlertTriangle, label: 'Alert Broadcasting', roles: ['Admin', 'Emergency Officer'] },
-    { path: '/shelters', icon: HomeIcon, label: 'Shelter Management', roles: ['Admin', 'Shelter Manager'] },
-    { path: '/resources', icon: Package, label: 'Resource Management', roles: ['Admin', 'Resource Manager'] },
-    { path: '/admin', icon: Users, label: 'Admin Management', roles: ['Admin'] },
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['System Admin', 'Admin', 'First Responder', 'Shelter Manager', 'Resource Manager'] },
+    { path: '/sos', icon: Radio, label: 'SOS Monitoring', roles: ['System Admin', 'Admin', 'First Responder'] },
+    { path: '/alerts', icon: AlertTriangle, label: 'Alert Broadcasting', roles: ['System Admin', 'Admin', 'First Responder'] },
+    { path: '/shelters', icon: HomeIcon, label: 'Shelter Management', roles: ['System Admin', 'Admin', 'Shelter Manager'] },
+    { path: '/resources', icon: Package, label: 'Resource Management', roles: ['System Admin', 'Admin', 'Resource Manager'] },
+    { path: '/admin', icon: Users, label: 'Admin Management', roles: ['System Admin', 'Admin'] },
   ];
 
-  const filteredNavItems = navItems.filter(item => 
+  const filteredNavItems = navItems.filter(item =>
     user && item.roles.includes(user.role)
   );
 
@@ -55,11 +72,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 <ShieldAlert className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">DAECS</h1>
-                <p className="text-xs text-gray-500">Disaster Alert & Emergency Coordination</p>
+                <h1 className="text-xl font-bold text-gray-900">{settings.systemName}</h1>
+                <p className="text-xs text-gray-500">{settings.organizationName}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
@@ -67,7 +84,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                   3
                 </span>
               </Button>
-              
+
               <div className="flex items-center gap-3 border-l pl-4">
                 <div className="text-right">
                   <p className="text-sm font-semibold">{user?.name}</p>
@@ -96,11 +113,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               <Link key={item.path} to={item.path}>
                 <Button
                   variant={isActive(item.path) ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-3 ${
-                    isActive(item.path)
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : 'hover:bg-gray-100'
-                  }`}
+                  className={`w-full justify-start gap-3 ${isActive(item.path)
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'hover:bg-gray-100'
+                    }`}
                 >
                   <item.icon className="h-5 w-5" />
                   {item.label}

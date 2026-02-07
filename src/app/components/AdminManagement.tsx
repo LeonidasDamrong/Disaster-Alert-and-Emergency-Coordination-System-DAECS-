@@ -8,20 +8,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Users, Plus, Clock, Settings, Bell, Pencil, Trash2 } from 'lucide-react';
-import { mockSystemSettings, mockAnnouncements } from '../lib/mockData';
-import { User, UserRole, AuditLog, Announcement } from '../lib/types';
+import { Users, Plus, Clock, Settings, Bell, Pencil, Trash2, Save, X } from 'lucide-react';
+import { mockSystemSettings } from '../lib/mockData';
+import { User, UserRole, AuditLog, Announcement, SystemSettings } from '../lib/types';
 import { toast } from 'sonner';
-import { authApi, auditLogApi } from '../lib/api';
+import { authApi, auditLogApi, systemSettingsApi, announcementApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 export const AdminManagement = () => {
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(true);
-  const [announcements, setAnnouncements] = useState<Announcement[]>(mockAnnouncements);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  // System Settings State
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(mockSystemSettings);
+  const [isEditingSettings, setIsEditingSettings] = useState(false);
+  const [tempSettings, setTempSettings] = useState<SystemSettings>(mockSystemSettings);
+
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -31,27 +37,38 @@ export const AdminManagement = () => {
     userId: '',
     password: '',
     name: '',
-    role: 'Emergency Officer' as UserRole,
+    role: 'First Responder' as UserRole,
     email: '',
     phone: ''
   });
 
-  // Fetch users, roles, and audit logs from database on component mount
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    content: '',
+    priority: 'Low' as 'Low' | 'Medium' | 'High',
+    expiresAt: ''
+  });
+
+  // Fetch users, roles, audit logs, and settings
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoadingUsers(true);
-        const [usersData, rolesData] = await Promise.all([
+        const [usersData, rolesData, settingsData] = await Promise.all([
           authApi.getAllUsers(),
-          authApi.getRoles()
+          authApi.getRoles(),
+          systemSettingsApi.getSettings()
         ]);
         setUsers(usersData);
-        const roleList = rolesData.length > 0 ? rolesData : ['Emergency Officer', 'Shelter Manager', 'Resource Manager'];
+        setSystemSettings(settingsData);
+        setTempSettings(settingsData);
+
+        const roleList = rolesData.length > 0 ? rolesData : ['First Responder', 'Shelter Manager', 'Resource Manager'];
         setRoles(roleList);
       } catch (error) {
-        console.error('Error fetching users:', error);
-        toast.error('Failed to load users');
-        setRoles(['Emergency Officer', 'Shelter Manager', 'Resource Manager']);
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load system data');
+        setRoles(['First Responder', 'Shelter Manager', 'Resource Manager']);
       } finally {
         setIsLoadingUsers(false);
       }
@@ -76,6 +93,19 @@ export const AdminManagement = () => {
     };
 
     fetchAuditLogs();
+  }, []);
+
+  // Fetch announcements
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        const data = await announcementApi.getAll();
+        setAnnouncements(data);
+      } catch (error) {
+        console.error('Error fetching announcements:', error);
+      }
+    };
+    fetchAnnouncements();
   }, []);
 
   // Set default role when roles load and current role may not exist
@@ -117,7 +147,7 @@ export const AdminManagement = () => {
         userId: '',
         password: '',
         name: '',
-        role: 'Emergency Officer',
+        role: 'First Responder',
         email: '',
         phone: ''
       });
@@ -194,10 +224,37 @@ export const AdminManagement = () => {
     }
   };
 
+  const handleEditSettings = () => {
+    setTempSettings({ ...systemSettings });
+    setIsEditingSettings(true);
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      await systemSettingsApi.updateSettings(tempSettings);
+      setSystemSettings(tempSettings);
+      setIsEditingSettings(false);
+
+      // Add audit log
+      // In a real app the backend would handle audit logging for this action.
+
+      toast.success('System settings updated');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
+    }
+  };
+
+  const handleCancelSettings = () => {
+    setIsEditingSettings(false);
+    setTempSettings(systemSettings);
+  };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
+      case 'System Admin': return 'bg-gray-900 text-white';
       case 'Admin': return 'bg-red-100 text-red-800';
-      case 'Emergency Officer': return 'bg-blue-100 text-blue-800';
+      case 'First Responder': return 'bg-blue-100 text-blue-800';
       case 'Shelter Manager': return 'bg-green-100 text-green-800';
       case 'Resource Manager': return 'bg-purple-100 text-purple-800';
       case 'Disaster Manager': return 'bg-amber-100 text-amber-800';
@@ -251,8 +308,8 @@ export const AdminManagement = () => {
             </Card>
             <Card>
               <CardContent className="p-6">
-                <p className="text-sm text-gray-600">Officers</p>
-                <p className="text-3xl font-bold mt-1">{users.filter(u => u.role === 'Emergency Officer').length}</p>
+                <p className="text-sm text-gray-600">Responders</p>
+                <p className="text-3xl font-bold mt-1">{users.filter(u => u.role === 'First Responder').length}</p>
               </CardContent>
             </Card>
             <Card>
@@ -436,7 +493,6 @@ export const AdminManagement = () => {
                 </TableHeader>
                 <TableBody>
                   {users
-                    .filter((user) => user.name !== 'System Administrator')
                     .map((user) => (
                       <TableRow key={user.id ?? user.userId}>
                         <TableCell className="font-mono">{user.userId}</TableCell>
@@ -452,24 +508,26 @@ export const AdminManagement = () => {
                           {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-MY') : '-'}
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditingUser({ ...user })}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteUser(user)}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {currentUser?.role === 'System Admin' || (currentUser?.role === 'Admin' && user.role !== 'System Admin' && user.role !== 'Admin') ? (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingUser({ ...user })}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteUser(user)}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -494,7 +552,7 @@ export const AdminManagement = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Timestamp</TableHead>
-                      <TableHead>User</TableHead>
+                      <TableHead>User Info</TableHead>
                       <TableHead>Module</TableHead>
                       <TableHead>Action</TableHead>
                       <TableHead>Details</TableHead>
@@ -506,7 +564,10 @@ export const AdminManagement = () => {
                         <TableCell className="text-sm">
                           {new Date(log.timestamp).toLocaleString('en-MY')}
                         </TableCell>
-                        <TableCell className="font-semibold">{log.userName}</TableCell>
+                        <TableCell className="font-semibold">
+                          <div>{log.name}</div>
+                          <div className="text-xs text-gray-500">{log.username}</div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">{log.module}</Badge>
                         </TableCell>
@@ -525,26 +586,75 @@ export const AdminManagement = () => {
         <TabsContent value="settings">
           <Card>
             <CardHeader>
-              <CardTitle>System Settings</CardTitle>
-              <CardDescription>Configure system parameters</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>System Settings</CardTitle>
+                  <CardDescription>Configure system parameters</CardDescription>
+                </div>
+                {currentUser?.role === 'System Admin' && !isEditingSettings && (
+                  <Button onClick={handleEditSettings} size="sm" variant="outline" className="gap-2">
+                    <Pencil className="h-4 w-4" />
+                    Edit Settings
+                  </Button>
+                )}
+                {isEditingSettings && (
+                  <div className="flex gap-2">
+                    <Button onClick={handleCancelSettings} size="sm" variant="outline" className="gap-2">
+                      <X className="h-4 w-4" />
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveSettings} size="sm" className="gap-2 bg-green-600 hover:bg-green-700">
+                      <Save className="h-4 w-4" />
+                      Save Changes
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>System Name</Label>
-                  <Input value={mockSystemSettings.systemName} readOnly />
+                  <Input
+                    value={isEditingSettings ? tempSettings.systemName : systemSettings.systemName}
+                    readOnly={!isEditingSettings}
+                    onChange={(e) => setTempSettings({ ...tempSettings, systemName: e.target.value })}
+                    className={!isEditingSettings ? 'bg-gray-50' : ''}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Organization Name</Label>
-                  <Input value={mockSystemSettings.organizationName} readOnly />
+                  <Input
+                    value={isEditingSettings ? tempSettings.organizationName : systemSettings.organizationName}
+                    readOnly={!isEditingSettings}
+                    onChange={(e) => setTempSettings({ ...tempSettings, organizationName: e.target.value })}
+                    className={!isEditingSettings ? 'bg-gray-50' : ''}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Emergency Contact Number</Label>
-                  <Input value={mockSystemSettings.emergencyContactNumber} readOnly />
+                  <Input
+                    value={isEditingSettings ? tempSettings.emergencyContactNumber : systemSettings.emergencyContactNumber}
+                    readOnly={!isEditingSettings}
+                    onChange={(e) => setTempSettings({ ...tempSettings, emergencyContactNumber: e.target.value })}
+                    className={!isEditingSettings ? 'bg-gray-50' : ''}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Notifications Enabled</Label>
-                  <Input value={mockSystemSettings.enableNotifications ? 'Yes' : 'No'} readOnly />
+                  <Select
+                    value={isEditingSettings ? (tempSettings.enableNotifications ? 'Yes' : 'No') : (systemSettings.enableNotifications ? 'Yes' : 'No')}
+                    onValueChange={(val) => setTempSettings({ ...tempSettings, enableNotifications: val === 'Yes' })}
+                    disabled={!isEditingSettings}
+                  >
+                    <SelectTrigger className={!isEditingSettings ? 'bg-gray-50' : ''}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
@@ -555,8 +665,105 @@ export const AdminManagement = () => {
         <TabsContent value="announcements">
           <Card>
             <CardHeader>
-              <CardTitle>System Announcements</CardTitle>
-              <CardDescription>Manage system-wide announcements</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>System Announcements</CardTitle>
+                  <CardDescription>Manage system-wide announcements</CardDescription>
+                </div>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create Announcement
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Announcement</DialogTitle>
+                      <DialogDescription>Broadcast a new message to all users</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      try {
+                        const announcementData = {
+                          title: newAnnouncement.title,
+                          content: newAnnouncement.content,
+                          priority: newAnnouncement.priority,
+                          isActive: true,
+                          expiresAt: newAnnouncement.expiresAt ? new Date(newAnnouncement.expiresAt).toISOString() : undefined
+                        };
+
+                        await announcementApi.create(announcementData as any); // Type assertion needed due to Partial<Announcement> in api types vs strict types here, or just let it infer
+                        toast.success('Announcement published');
+                        // Refresh list
+                        const data = await announcementApi.getAll();
+                        setAnnouncements(data);
+                        setNewAnnouncement({
+                          title: '',
+                          content: '',
+                          priority: 'Low',
+                          expiresAt: ''
+                        });
+                        // Close dialog (optional, but good UX - requires adding state for dialog open)
+                      } catch (error) {
+                        console.error(error);
+                        toast.error(error instanceof Error ? error.message : 'Failed to create announcement');
+                      }
+                    }} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="title">Title *</Label>
+                        <Input
+                          id="title"
+                          name="title"
+                          required
+                          placeholder="e.g. System Maintenance"
+                          value={newAnnouncement.title}
+                          onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="priority">Priority</Label>
+                        <Select
+                          name="priority"
+                          value={newAnnouncement.priority}
+                          onValueChange={(val: 'Low' | 'Medium' | 'High') => setNewAnnouncement({ ...newAnnouncement, priority: val })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="content">Content *</Label>
+                        <Input
+                          id="content"
+                          name="content"
+                          required
+                          placeholder="Announcement details..."
+                          value={newAnnouncement.content}
+                          onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="expiresAt">Expires At (Optional)</Label>
+                        <Input
+                          id="expiresAt"
+                          name="expiresAt"
+                          type="date"
+                          value={newAnnouncement.expiresAt}
+                          onChange={(e) => setNewAnnouncement({ ...newAnnouncement, expiresAt: e.target.value })}
+                        />
+                      </div>
+                      <Button type="submit" className="w-full">Publish Announcement</Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -566,8 +773,8 @@ export const AdminManagement = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h4 className="font-semibold">{announcement.title}</h4>
-                          <Badge variant={announcement.active ? 'default' : 'secondary'}>
-                            {announcement.active ? 'Active' : 'Inactive'}
+                          <Badge variant={announcement.isActive ? 'default' : 'secondary'}>
+                            {announcement.isActive ? 'Active' : 'Inactive'}
                           </Badge>
                           <Badge className={
                             announcement.priority === 'High' ? 'bg-red-100 text-red-800' :
@@ -586,9 +793,31 @@ export const AdminManagement = () => {
                           )}
                         </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={async () => {
+                          if (!confirm('Delete this announcement?')) return;
+                          try {
+                            await announcementApi.delete(announcement.id);
+                            toast.success('Announcement deleted');
+                            const data = await announcementApi.getAll();
+                            setAnnouncements(data);
+                          } catch (err) {
+                            console.error(err);
+                            toast.error('Failed to delete');
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
+                {announcements.length === 0 && (
+                  <p className="text-center text-gray-500 py-6">No announcements found.</p>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,5 +1,5 @@
 // User and Authentication Types
-export type UserRole = 'Admin' | 'Emergency Officer' | 'Shelter Manager' | 'Resource Manager' | 'Disaster Manager';
+export type UserRole = 'System Admin' | 'Admin' | 'First Responder' | 'Shelter Manager' | 'Resource Manager' | 'Disaster Manager';
 
 export interface User {
   id: string;
@@ -26,7 +26,7 @@ export interface SOS {
   description: string;
   urgency: UrgencyLevel;
   status: SOSStatus;
-  assignedOfficer?: string;
+  assignedResponder?: string;
   createdAt: string;
   updatedAt: string;
   notes: CaseNote[];
@@ -115,8 +115,8 @@ export interface ResourceRequest {
 // Audit Log Types
 export interface AuditLog {
   id: string;
-  userId: string;
-  userName: string;
+  username: string;
+  name: string;
   action: string;
   module: string;
   details: string;
@@ -125,12 +125,15 @@ export interface AuditLog {
 
 // System Settings Types
 export interface SystemSettings {
+  id?: number;
   systemName: string;
   organizationName: string;
   enableNotifications: boolean;
-  enableSMS: boolean;
   emergencyContactNumber: string;
-  maintenanceMode: boolean;
+  updatedAt?: string;
+  // properties not yet in backend
+  enableSMS?: boolean;
+  maintenanceMode?: boolean;
 }
 
 // Announcement Types
@@ -139,7 +142,7 @@ export interface Announcement {
   title: string;
   content: string;
   priority: 'Low' | 'Medium' | 'High';
-  active: boolean;
+  isActive: boolean;
   createdBy: string;
   createdAt: string;
   expiresAt?: string;

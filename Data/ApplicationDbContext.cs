@@ -13,5 +13,6 @@ namespace FYP_Project_II.Data
         public DbSet<ResourceRequest> ResourceRequests { get; set; }
         public DbSet<SOSRequest> SOSRequests { get; set; }
         public DbSet<Alert> Alerts { get; set; }
+        public DbSet<SystemSettings> SystemSettings { get; set; }
     }
 }

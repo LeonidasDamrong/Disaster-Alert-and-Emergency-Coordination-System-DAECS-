@@ -19,15 +19,15 @@ export const SOSMonitoring = () => {
   const [newNote, setNewNote] = useState('');
   const [filterStatus, setFilterStatus] = useState<SOSStatus | 'All'>('All');
 
-  const filteredSOS = filterStatus === 'All' 
-    ? sosRequests 
+  const filteredSOS = filterStatus === 'All'
+    ? sosRequests
     : sosRequests.filter(sos => sos.status === filterStatus);
 
   const handleAcceptSOS = (sosId: string) => {
     setSOSRequests(prev =>
       prev.map(sos =>
         sos.id === sosId
-          ? { ...sos, status: 'In Progress' as SOSStatus, assignedOfficer: 'Siti Nurhaliza', updatedAt: new Date().toISOString() }
+          ? { ...sos, status: 'In Progress' as SOSStatus, assignedResponder: 'Siti Nurhaliza', updatedAt: new Date().toISOString() }
           : sos
       )
     );
@@ -171,13 +171,13 @@ export const SOSMonitoring = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {sos.assignedOfficer || '-'}
+                    {sos.assignedResponder || '-'}
                   </TableCell>
                   <TableCell>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => setSelectedSOS(sos)}
                         >
@@ -191,7 +191,7 @@ export const SOSMonitoring = () => {
                             Created: {new Date(sos.createdAt).toLocaleString('en-MY')}
                           </DialogDescription>
                         </DialogHeader>
-                        
+
                         <div className="space-y-6">
                           {/* Victim Information */}
                           <div className="grid grid-cols-2 gap-4">
@@ -229,7 +229,7 @@ export const SOSMonitoring = () => {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Update Urgency Level</Label>
-                              <Select 
+                              <Select
                                 value={sos.urgency}
                                 onValueChange={(value) => handleUpdateUrgency(sos.id, value as UrgencyLevel)}
                               >
@@ -246,7 +246,7 @@ export const SOSMonitoring = () => {
                             </div>
                             <div className="space-y-2">
                               <Label>Update Status</Label>
-                              <Select 
+                              <Select
                                 value={sos.status}
                                 onValueChange={(value) => handleUpdateStatus(sos.id, value as SOSStatus)}
                               >
@@ -318,7 +318,7 @@ export const SOSMonitoring = () => {
                                 onChange={(e) => setNewNote(e.target.value)}
                                 rows={3}
                               />
-                              <Button 
+                              <Button
                                 onClick={() => handleAddNote(sos.id)}
                                 size="sm"
                                 className="gap-2"

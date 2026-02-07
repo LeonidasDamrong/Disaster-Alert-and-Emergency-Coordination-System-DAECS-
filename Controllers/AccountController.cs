@@ -137,7 +137,7 @@ namespace FYP_Project_II.Controllers
                     "",
                     ""
                 ),
-                "Emergency Officer" => new FirstResponder(
+                "First Responder" => new FirstResponder(
                     request.UserId,
                     request.Name,
                     request.Password,
@@ -169,8 +169,8 @@ namespace FYP_Project_II.Controllers
                 currentUserId = currentAppUser?.UserName ?? "system";
                 _context.AuditLogs.Add(new AuditLog
                 {
-                    UserId = currentUserId,
-                    UserName = currentUserName,
+                    Username = currentUserId,
+                    Name = currentUserName,
                     Action = "Create User",
                     Module = "Admin Management",
                     Details = $"Created new user: {request.UserId}",
@@ -218,7 +218,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpGet("users")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<IActionResult> GetAllUsers()
         {
             var users = await _userManager.Users.ToListAsync();
@@ -245,7 +245,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpGet("roles")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<IActionResult> GetRoles()
         {
             var allRoles = await _roleManager.Roles
@@ -266,7 +266,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpGet("next-user-id")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<IActionResult> GetNextUserId([FromQuery] string role)
         {
             if (string.IsNullOrEmpty(role))
@@ -275,7 +275,7 @@ namespace FYP_Project_II.Controllers
             var prefix = role switch
             {
                 "Admin" => "admin",
-                "Emergency Officer" => "officer",
+                "First Responder" => "responder",
                 "Shelter Manager" => "shelter",
                 "Resource Manager" => "resource",
                 "Disaster Manager" => "disaster",
@@ -303,7 +303,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpPut("users/{userId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserRequest request)
         {
             if (string.IsNullOrEmpty(userId))
@@ -325,8 +325,8 @@ namespace FYP_Project_II.Controllers
                 var currentUserName = User.FindFirst("Name")?.Value ?? "System";
                 _context.AuditLogs.Add(new AuditLog
                 {
-                    UserId = currentUserId,
-                    UserName = currentUserName,
+                    Username = currentUserId,
+                    Name = currentUserName,
                     Action = "Update User",
                     Module = "Admin Management",
                     Details = $"Updated user: {userId}",
@@ -339,7 +339,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpDelete("users/{userId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<IActionResult> DeleteUser(string userId)
         {
             if (string.IsNullOrEmpty(userId))
@@ -354,8 +354,8 @@ namespace FYP_Project_II.Controllers
                 var currentUserName = User.FindFirst("Name")?.Value ?? "System";
                 _context.AuditLogs.Add(new AuditLog
                 {
-                    UserId = currentUserId,
-                    UserName = currentUserName,
+                    Username = currentUserId,
+                    Name = currentUserName,
                     Action = "Delete User",
                     Module = "Admin Management",
                     Details = $"Deleted user: {userId}",

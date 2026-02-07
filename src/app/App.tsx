@@ -41,7 +41,7 @@ const AppRouter = () => {
         path="/login"
         element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
       />
-      
+
       <Route
         path="/dashboard"
         element={
@@ -56,7 +56,7 @@ const AppRouter = () => {
       <Route
         path="/sos"
         element={
-          <ProtectedRoute allowedRoles={['Admin', 'Emergency Officer']}>
+          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'First Responder']}>
             <DashboardLayout>
               <SOSMonitoring />
             </DashboardLayout>
@@ -67,7 +67,7 @@ const AppRouter = () => {
       <Route
         path="/alerts"
         element={
-          <ProtectedRoute allowedRoles={['Admin', 'Emergency Officer']}>
+          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'First Responder']}>
             <DashboardLayout>
               <AlertBroadcasting />
             </DashboardLayout>
@@ -78,7 +78,7 @@ const AppRouter = () => {
       <Route
         path="/shelters"
         element={
-          <ProtectedRoute allowedRoles={['Admin', 'Shelter Manager']}>
+          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'Shelter Manager']}>
             <DashboardLayout>
               <ShelterManagement />
             </DashboardLayout>
@@ -89,7 +89,7 @@ const AppRouter = () => {
       <Route
         path="/resources"
         element={
-          <ProtectedRoute allowedRoles={['Admin', 'Resource Manager']}>
+          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'Resource Manager']}>
             <DashboardLayout>
               <ResourceManagement />
             </DashboardLayout>
@@ -100,7 +100,7 @@ const AppRouter = () => {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute allowedRoles={['Admin']}>
+          <ProtectedRoute allowedRoles={['System Admin', 'Admin']}>
             <DashboardLayout>
               <AdminManagement />
             </DashboardLayout>

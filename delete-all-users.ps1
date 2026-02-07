@@ -34,7 +34,7 @@ Write-Host ""
 Write-Host "Deleting all users..." -ForegroundColor Cyan
 
 # List of user IDs to delete
-$userIds = @("admin001", "officer001", "shelter001", "resource001")
+$userIds = @("admin001", "responder001", "shelter001", "resource001")
 
 $deleteCount = 0
 $notFoundCount = 0

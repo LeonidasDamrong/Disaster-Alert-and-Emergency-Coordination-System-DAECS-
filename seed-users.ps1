@@ -31,12 +31,12 @@ $users = @(
         role     = "Admin"
     },
     @{
-        userId   = "officer001"
-        password = "Officer@123"
+        userId   = "responder001"
+        password = "Responder@123"
         name     = "Siti Nurhaliza"
         email    = "siti@daecs.gov.my"
         phone    = "+60123456790"
-        role     = "Emergency Officer"
+        role     = "First Responder"
     },
     @{
         userId   = "shelter001"

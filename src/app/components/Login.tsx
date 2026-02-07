@@ -90,7 +90,7 @@ export const Login = () => {
               <p className="text-sm font-semibold text-blue-900 mb-2">Demo Credentials:</p>
               <div className="text-xs space-y-1 text-blue-800">
                 <p>Admin: <span className="font-mono">admin001 / Admin@123</span></p>
-                <p>Officer: <span className="font-mono">officer001 / Officer@123</span></p>
+                <p>Responder: <span className="font-mono">responder001 / Responder@123</span></p>
                 <p>Shelter Manager: <span className="font-mono">shelter001 / Shelter@123</span></p>
                 <p>Resource Manager: <span className="font-mono">resource001 / Resource@123</span></p>
               </div>

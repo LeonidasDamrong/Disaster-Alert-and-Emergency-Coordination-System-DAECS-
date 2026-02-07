@@ -17,7 +17,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<IActionResult> GetAuditLogs()
         {
             var logs = await _context.AuditLogs
@@ -25,8 +25,8 @@ namespace FYP_Project_II.Controllers
                 .Select(l => new
                 {
                     id = l.Id.ToString(),
-                    userId = l.UserId,
-                    userName = l.UserName,
+                    username = l.Username,
+                    name = l.Name,
                     action = l.Action,
                     module = l.Module,
                     details = l.Details,
