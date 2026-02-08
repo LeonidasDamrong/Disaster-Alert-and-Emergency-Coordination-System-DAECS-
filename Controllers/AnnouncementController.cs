@@ -128,24 +128,10 @@ namespace FYP_Project_II.Controllers
 
          private async Task LogAuditAsync(string action, string details)
         {
-            // Generate Custom ID: LOGXXX
-            var lastLog = await _context.AuditLogs
-                .OrderByDescending(l => l.Id)
-                .FirstOrDefaultAsync();
-
-            int nextId = 1;
-            if (lastLog != null && lastLog.Id.StartsWith("LOG"))
-            {
-                if (int.TryParse(lastLog.Id.Substring(3), out int currentId))
-                {
-                    nextId = currentId + 1;
-                }
-            }
-
             var user = await _userManager.GetUserAsync(User);
             var auditLog = new AuditLog
             {
-                Id = $"LOG{nextId:D3}",
+                Id = await AuditLog.GenerateNextIdAsync(_context),
                 Username = user?.UserName ?? "Unknown",
                 Name = user?.Name ?? "Unknown",
                 Action = action,

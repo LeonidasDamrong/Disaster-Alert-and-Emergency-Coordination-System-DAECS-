@@ -1,38 +1,412 @@
+using FYP_Project_II.Data;
+using FYP_Project_II.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace FYP_Project_II.Controllers
 {
-    public class ShelterController : Controller
+    [Route("api/shelters")]
+    [ApiController]
+    public class ShelterController : ControllerBase
     {
-        // GET: ShelterController
-        public ActionResult Index()
+        private readonly ApplicationDbContext _context;
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public ShelterController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
         {
-            return View();
+            _context = context;
+            _userManager = userManager;
         }
 
-        public ActionResult RegisterShelter(string shelter)
+        // ---------- Shelters ----------
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Shelter>>> GetShelters()
         {
-            Console.WriteLine($"Shelter registered: {shelter}");
-            return View();
+            return await _context.Shelters
+                .OrderBy(s => s.ShelterName)
+                .ToListAsync();
         }
 
-        public ActionResult UpdateShelterDetails(string shelter)
+        [HttpGet("{shelterId}")]
+        public async Task<ActionResult<Shelter>> GetShelter(string shelterId)
         {
-            Console.WriteLine($"Shelter updated: {shelter}");
-            return View();
+            var shelter = await _context.Shelters.FindAsync(shelterId);
+            if (shelter == null) return NotFound();
+            return shelter;
         }
 
-        public ActionResult DeleteShelter(string shelter)
+        [HttpGet("{shelterId}/full")]
+        public async Task<ActionResult<object>> GetShelterWithDetails(string shelterId)
         {
-            Console.WriteLine($"Shelter deleted: {shelter}");
-            return View();
+            var shelter = await _context.Shelters.FindAsync(shelterId);
+            if (shelter == null) return NotFound();
+
+            var evacuees = await _context.Evacuees
+                .Where(e => e.ShelterId == shelterId && e.EvacueeCheckOutDate == null)
+                .ToListAsync();
+            var resources = await _context.ShelterResources
+                .Where(r => r.ShelterId == shelterId)
+                .ToListAsync();
+
+            return Ok(new
+            {
+                shelter,
+                evacuees,
+                resources
+            });
         }
 
-        public ActionResult ViewAllShelters()
+        [HttpPost]
+        [Authorize(Roles = "Admin, System Admin")]
+        public async Task<ActionResult<Shelter>> CreateShelter(Shelter shelter)
         {
-            Console.WriteLine($"All shelters viewed");
-            return View();
+            shelter.ShelterId = await GenerateNextShelterIdAsync();
+            shelter.RegisteredAt = DateTime.UtcNow;
+            shelter.LastModifiedAt = DateTime.UtcNow;
+            shelter.AvailableCapacity = shelter.TotalCapacity;
+
+            _context.Shelters.Add(shelter);
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Create Shelter", $"Created shelter: {shelter.ShelterName}");
+
+            return CreatedAtAction(nameof(GetShelter), new { shelterId = shelter.ShelterId }, shelter);
         }
 
+        [HttpPut("{shelterId}")]
+        [Authorize(Roles = "Admin, System Admin")]
+        public async Task<IActionResult> UpdateShelter(string shelterId, Shelter shelter)
+        {
+            if (shelterId != shelter.ShelterId) return BadRequest();
+
+            var existing = await _context.Shelters.FindAsync(shelterId);
+            if (existing == null) return NotFound();
+
+            existing.ShelterName = shelter.ShelterName;
+            existing.Address = shelter.Address;
+            existing.TotalCapacity = shelter.TotalCapacity;
+            existing.Status = shelter.Status;
+            existing.ManagedBy = shelter.ManagedBy;
+            existing.AvailableCapacity = shelter.AvailableCapacity;
+            existing.LastModifiedAt = DateTime.UtcNow;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                await LogAuditAsync("Update Shelter", $"Updated shelter: {shelter.ShelterName}");
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!ShelterExists(shelterId)) return NotFound();
+                throw;
+            }
+
+            return NoContent();
+        }
+
+        [HttpDelete("{shelterId}")]
+        [Authorize(Roles = "Admin, System Admin")]
+        public async Task<IActionResult> DeleteShelter(string shelterId)
+        {
+            var shelter = await _context.Shelters.FindAsync(shelterId);
+            if (shelter == null) return NotFound();
+
+            var hasEvacuees = await _context.Evacuees.AnyAsync(e => e.ShelterId == shelterId && e.EvacueeCheckOutDate == null);
+            if (hasEvacuees)
+                return BadRequest(new { message = "Cannot delete shelter with active evacuees. Check out all evacuees first." });
+
+            _context.ShelterResources.RemoveRange(await _context.ShelterResources.Where(r => r.ShelterId == shelterId).ToListAsync());
+            _context.ShelterReports.RemoveRange(await _context.ShelterReports.Where(r => r.ShelterId == shelterId).ToListAsync());
+            _context.Shelters.Remove(shelter);
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Delete Shelter", $"Deleted shelter: {shelter.ShelterName}");
+
+            return NoContent();
+        }
+
+        // ---------- Evacuees ----------
+        [HttpGet("{shelterId}/evacuees")]
+        public async Task<ActionResult<IEnumerable<Evacuee>>> GetEvacuees(string shelterId, [FromQuery] bool activeOnly = true)
+        {
+            if (!ShelterExists(shelterId)) return NotFound();
+
+            var query = _context.Evacuees.Where(e => e.ShelterId == shelterId);
+            if (activeOnly)
+                query = query.Where(e => e.EvacueeCheckOutDate == null);
+
+            return await query.OrderByDescending(e => e.EvacueeCheckInDate).ToListAsync();
+        }
+
+        [HttpPost("{shelterId}/evacuees")]
+        [Authorize]
+        public async Task<ActionResult<Evacuee>> RegisterEvacuee(string shelterId, Evacuee evacuee)
+        {
+            var shelter = await _context.Shelters.FindAsync(shelterId);
+            if (shelter == null) return NotFound();
+            if (shelter.AvailableCapacity <= 0)
+                return BadRequest(new { message = "Shelter has no available capacity." });
+
+            evacuee.EvacueeId = await GenerateNextEvacueeIdAsync();
+            evacuee.ShelterId = shelterId;
+            evacuee.EvacueeCheckInDate = DateTime.UtcNow;
+            evacuee.EvacueeCheckOutDate = null;
+
+            _context.Evacuees.Add(evacuee);
+            shelter.AvailableCapacity--;
+            if (shelter.AvailableCapacity == 0)
+                shelter.Status = "Full";
+            shelter.LastModifiedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            await LogAuditAsync("Register Evacuee", $"Registered evacuee {evacuee.EvacueeName} at {shelter.ShelterName}");
+
+            return CreatedAtAction(nameof(GetEvacuees), new { shelterId }, evacuee);
+        }
+
+        [HttpPut("{shelterId}/evacuees/{evacueeId}")]
+        [Authorize]
+        public async Task<IActionResult> UpdateEvacuee(string shelterId, string evacueeId, Evacuee evacuee)
+        {
+            if (evacueeId != evacuee.EvacueeId || shelterId != evacuee.ShelterId) return BadRequest();
+
+            var existing = await _context.Evacuees.FindAsync(evacueeId);
+            if (existing == null || existing.ShelterId != shelterId) return NotFound();
+
+            existing.EvacueeName = evacuee.EvacueeName;
+            existing.EvacueeIdNumber = evacuee.EvacueeIdNumber;
+            existing.EvacueeGender = evacuee.EvacueeGender;
+            existing.EvacueeAge = evacuee.EvacueeAge;
+            existing.EvacueePhone = evacuee.EvacueePhone;
+            existing.EvacueeMedicalNeeds = evacuee.EvacueeMedicalNeeds;
+            existing.EvacueeCheckOutDate = evacuee.EvacueeCheckOutDate;
+
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Update Evacuee", $"Updated evacuee {evacuee.EvacueeName}");
+
+            return NoContent();
+        }
+
+        [HttpPost("{shelterId}/evacuees/{evacueeId}/checkout")]
+        [Authorize]
+        public async Task<IActionResult> CheckOutEvacuee(string shelterId, string evacueeId)
+        {
+            var evacuee = await _context.Evacuees.FindAsync(evacueeId);
+            if (evacuee == null || evacuee.ShelterId != shelterId) return NotFound();
+            if (evacuee.EvacueeCheckOutDate.HasValue)
+                return BadRequest(new { message = "Evacuee already checked out." });
+
+            var shelter = await _context.Shelters.FindAsync(shelterId);
+            if (shelter == null) return NotFound();
+
+            evacuee.EvacueeCheckOutDate = DateTime.UtcNow;
+            shelter.AvailableCapacity++;
+            if (shelter.Status == "Full")
+                shelter.Status = "Open";
+            shelter.LastModifiedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            await LogAuditAsync("Check Out Evacuee", $"Checked out {evacuee.EvacueeName} from {shelter.ShelterName}");
+
+            return NoContent();
+        }
+
+        // ---------- Shelter Resources ----------
+        [HttpGet("{shelterId}/resources")]
+        public async Task<ActionResult<IEnumerable<ShelterResource>>> GetShelterResources(string shelterId)
+        {
+            if (!ShelterExists(shelterId)) return NotFound();
+            return await _context.ShelterResources
+                .Where(r => r.ShelterId == shelterId)
+                .OrderBy(r => r.ResourceType)
+                .ToListAsync();
+        }
+
+        [HttpPost("{shelterId}/resources")]
+        [Authorize]
+        public async Task<ActionResult<ShelterResource>> AddShelterResource(string shelterId, ShelterResource resource)
+        {
+            var shelter = await _context.Shelters.FindAsync(shelterId);
+            if (shelter == null) return NotFound();
+
+            resource.ShelterResourceId = await GenerateNextShelterResourceIdAsync();
+            resource.ShelterId = shelterId;
+            resource.CreatedAt = DateTime.UtcNow;
+            resource.UpdatedAt = DateTime.UtcNow;
+
+            _context.ShelterResources.Add(resource);
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Add Shelter Resource", $"Added {resource.ResourceType} x{resource.Quantity} to {shelter.ShelterName}");
+
+            return CreatedAtAction(nameof(GetShelterResources), new { shelterId }, resource);
+        }
+
+        [HttpPut("{shelterId}/resources/{resourceId}")]
+        [Authorize]
+        public async Task<IActionResult> UpdateShelterResource(string shelterId, string resourceId, ShelterResource resource)
+        {
+            if (resourceId != resource.ShelterResourceId || shelterId != resource.ShelterId) return BadRequest();
+
+            var existing = await _context.ShelterResources.FindAsync(resourceId);
+            if (existing == null || existing.ShelterId != shelterId) return NotFound();
+
+            existing.ResourceType = resource.ResourceType;
+            existing.Quantity = resource.Quantity;
+            existing.ResourceItemId = resource.ResourceItemId;
+            existing.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpDelete("{shelterId}/resources/{resourceId}")]
+        [Authorize]
+        public async Task<IActionResult> DeleteShelterResource(string shelterId, string resourceId)
+        {
+            var resource = await _context.ShelterResources.FindAsync(resourceId);
+            if (resource == null || resource.ShelterId != shelterId) return NotFound();
+
+            _context.ShelterResources.Remove(resource);
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Remove Shelter Resource", $"Removed resource {resource.ResourceType} from shelter {shelterId}");
+            return NoContent();
+        }
+
+        // ---------- Shelter Reports ----------
+        [HttpGet("{shelterId}/reports")]
+        public async Task<ActionResult<IEnumerable<ShelterReport>>> GetShelterReports(string shelterId)
+        {
+            if (!ShelterExists(shelterId)) return NotFound();
+            return await _context.ShelterReports
+                .Where(r => r.ShelterId == shelterId)
+                .OrderByDescending(r => r.GeneratedAt)
+                .ToListAsync();
+        }
+
+        [HttpPost("{shelterId}/reports")]
+        [Authorize]
+        public async Task<ActionResult<ShelterReport>> GenerateShelterReport(string shelterId)
+        {
+            var shelter = await _context.Shelters.FindAsync(shelterId);
+            if (shelter == null) return NotFound();
+
+            var resources = await _context.ShelterResources
+                .Where(r => r.ShelterId == shelterId)
+                .ToListAsync();
+            var resourceSummary = resources.Count == 0
+                ? "No resources recorded"
+                : string.Join("; ", resources.Select(r => $"{r.ResourceType}: {r.Quantity}"));
+
+            var report = new ShelterReport
+            {
+                ShelterReportId = await GenerateNextShelterReportIdAsync(),
+                ShelterId = shelterId,
+                Name = shelter.ShelterName,
+                Location = shelter.Address,
+                TotalCapacity = shelter.TotalCapacity,
+                AvailableCapacity = shelter.AvailableCapacity,
+                Status = shelter.Status,
+                ResourceSummary = resourceSummary,
+                GeneratedAt = DateTime.UtcNow
+            };
+
+            _context.ShelterReports.Add(report);
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Generate Shelter Report", $"Generated report for {shelter.ShelterName}");
+
+            return CreatedAtAction(nameof(GetShelterReports), new { shelterId }, report);
+        }
+
+        // ---------- Helpers ----------
+        private bool ShelterExists(string shelterId)
+        {
+            return _context.Shelters.Any(e => e.ShelterId == shelterId);
+        }
+
+        private static async Task<string> GenerateNextShelterIdAsync(ApplicationDbContext context)
+        {
+            var last = await context.Shelters.OrderByDescending(s => s.ShelterId).FirstOrDefaultAsync();
+            int next = 1;
+            if (last != null && last.ShelterId.StartsWith("SHELTER", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(last.ShelterId.Length >= 7 ? last.ShelterId.Substring(7) : null, out int n))
+                    next = n + 1;
+            }
+            return $"SHELTER{next:D3}";
+        }
+
+        private async Task<string> GenerateNextShelterIdAsync()
+        {
+            return await GenerateNextShelterIdAsync(_context);
+        }
+
+        private static async Task<string> GenerateNextEvacueeIdAsync(ApplicationDbContext context)
+        {
+            var last = await context.Evacuees.OrderByDescending(e => e.EvacueeId).FirstOrDefaultAsync();
+            int next = 1;
+            if (last != null && last.EvacueeId.StartsWith("EV", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(last.EvacueeId.Length >= 2 ? last.EvacueeId.Substring(2) : null, out int n))
+                    next = n + 1;
+            }
+            return $"EV{next:D3}";
+        }
+
+        private async Task<string> GenerateNextEvacueeIdAsync()
+        {
+            return await GenerateNextEvacueeIdAsync(_context);
+        }
+
+        private static async Task<string> GenerateNextShelterResourceIdAsync(ApplicationDbContext context)
+        {
+            var last = await context.ShelterResources.OrderByDescending(r => r.ShelterResourceId).FirstOrDefaultAsync();
+            int next = 1;
+            if (last != null && last.ShelterResourceId.StartsWith("SR", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(last.ShelterResourceId.Length >= 2 ? last.ShelterResourceId.Substring(2) : null, out int n))
+                    next = n + 1;
+            }
+            return $"SR{next:D3}";
+        }
+
+        private async Task<string> GenerateNextShelterResourceIdAsync()
+        {
+            return await GenerateNextShelterResourceIdAsync(_context);
+        }
+
+        private static async Task<string> GenerateNextShelterReportIdAsync(ApplicationDbContext context)
+        {
+            var last = await context.ShelterReports.OrderByDescending(r => r.ShelterReportId).FirstOrDefaultAsync();
+            int next = 1;
+            if (last != null && last.ShelterReportId.StartsWith("SHR", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(last.ShelterReportId.Length >= 3 ? last.ShelterReportId.Substring(3) : null, out int n))
+                    next = n + 1;
+            }
+            return $"SHR{next:D3}";
+        }
+
+        private async Task<string> GenerateNextShelterReportIdAsync()
+        {
+            return await GenerateNextShelterReportIdAsync(_context);
+        }
+
+        private async Task LogAuditAsync(string action, string details)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            var auditLog = new AuditLog
+            {
+                Id = await AuditLog.GenerateNextIdAsync(_context),
+                Username = user?.UserName ?? "Unknown",
+                Name = user?.Name ?? "Unknown",
+                Action = action,
+                Module = "Shelter Management",
+                Details = details,
+                Timestamp = DateTime.UtcNow
+            };
+            _context.AuditLogs.Add(auditLog);
+            await _context.SaveChangesAsync();
+        }
     }
 }

@@ -63,7 +63,7 @@ export interface Shelter {
   id: string;
   name: string;
   location: string;
-  capacity: number;
+  TotalCapacity: number;
   currentOccupancy: number;
   status: ShelterStatus;
   manager: string;
@@ -81,6 +81,55 @@ export interface Evacuee {
   phone: string;
   checkinDate: string;
   medicalNeeds?: string;
+  idNumber?: string;
+}
+
+// Backend API shapes for shelter module
+export interface ShelterApi {
+  shelterId: string;
+  shelterName: string;
+  address: string;
+  totalCapacity: number;
+  availableCapacity: number;
+  status: string;
+  managedBy?: string | null;
+  registeredAt: string;
+  lastModifiedAt: string;
+}
+
+export interface EvacueeApi {
+  evacueeId: string;
+  shelterId: string;
+  evacueeName: string;
+  evacueeIdNumber?: string | null;
+  evacueeGender: string;
+  evacueeAge: number;
+  evacueePhone?: string | null;
+  evacueeMedicalNeeds?: string | null;
+  evacueeCheckInDate: string;
+  evacueeCheckOutDate?: string | null;
+}
+
+export interface ShelterResourceApi {
+  shelterResourceId: string;
+  shelterId: string;
+  resourceItemId?: string | null;
+  resourceType: string;
+  quantity: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShelterReportApi {
+  shelterReportId: string;
+  shelterId: string;
+  name: string;
+  location: string;
+  totalCapacity: number;
+  availableCapacity: number;
+  status: string;
+  resourceSummary: string;
+  generatedAt: string;
 }
 
 // Resource Types

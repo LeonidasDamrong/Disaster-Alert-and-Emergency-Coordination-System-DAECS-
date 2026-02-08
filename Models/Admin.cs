@@ -1,3 +1,5 @@
+using FYP_Project_II.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 
 namespace FYP_Project_II.Models
@@ -112,11 +114,14 @@ namespace FYP_Project_II.Models
             Console.WriteLine($"User {userId} assigned role {role}");
         }
 
-        public void ViewAuditLogs()
+        public async Task<List<AuditLog>> ViewAuditLogs(ApplicationDbContext context)
         {
-            // TODO: Implement audit logs viewing logic
-            // Need to create a table for audit logs in the database
-            Console.WriteLine($"Audit logs viewed");
+            if (context == null) 
+                throw new ArgumentNullException(nameof(context));
+
+            return await context.AuditLogs
+                .OrderByDescending(l => l.Timestamp)
+                .ToListAsync();
         }
 
         // public void GenerateSystemReport(string reportType)

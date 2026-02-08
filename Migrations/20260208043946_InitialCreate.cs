@@ -105,6 +105,26 @@ namespace FYP_Project_II.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Evacuees",
+                columns: table => new
+                {
+                    EvacueeId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ShelterId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EvacueeName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EvacueeIdNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    EvacueeGender = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EvacueeAge = table.Column<int>(type: "int", nullable: false),
+                    EvacueePhone = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    EvacueeMedicalNeeds = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    EvacueeCheckInDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    EvacueeCheckOutDate = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Evacuees", x => x.EvacueeId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ResourceRequests",
                 columns: table => new
                 {
@@ -140,17 +160,54 @@ namespace FYP_Project_II.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ShelterReports",
+                columns: table => new
+                {
+                    ShelterReportId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ShelterId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Location = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalCapacity = table.Column<int>(type: "int", nullable: false),
+                    AvailableCapacity = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ResourceSummary = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    GeneratedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ShelterReports", x => x.ShelterReportId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ShelterResources",
+                columns: table => new
+                {
+                    ShelterResourceId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ShelterId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ResourceItemId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ResourceType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ShelterResources", x => x.ShelterResourceId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Shelters",
                 columns: table => new
                 {
                     ShelterId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Location = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Capacity = table.Column<int>(type: "int", nullable: false),
+                    ShelterName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalCapacity = table.Column<int>(type: "int", nullable: false),
                     AvailableCapacity = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    ManagedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RegisteredAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    LastModifiedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -364,10 +421,19 @@ namespace FYP_Project_II.Migrations
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "Evacuees");
+
+            migrationBuilder.DropTable(
                 name: "ResourceRequests");
 
             migrationBuilder.DropTable(
                 name: "Resources");
+
+            migrationBuilder.DropTable(
+                name: "ShelterReports");
+
+            migrationBuilder.DropTable(
+                name: "ShelterResources");
 
             migrationBuilder.DropTable(
                 name: "Shelters");

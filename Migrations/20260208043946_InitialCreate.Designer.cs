@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FYP_Project_II.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260207171315_InitialCreate")]
+    [Migration("20260208043946_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -196,6 +196,46 @@ namespace FYP_Project_II.Migrations
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("FYP_Project_II.Models.Evacuee", b =>
+                {
+                    b.Property<string>("EvacueeId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("EvacueeAge")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EvacueeCheckInDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EvacueeCheckOutDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EvacueeGender")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EvacueeIdNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EvacueeMedicalNeeds")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EvacueeName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EvacueePhone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ShelterId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("EvacueeId");
+
+                    b.ToTable("Evacuees");
+                });
+
             modelBuilder.Entity("FYP_Project_II.Models.ResourceItem", b =>
                 {
                     b.Property<string>("ResourceItemId")
@@ -295,13 +335,47 @@ namespace FYP_Project_II.Migrations
                     b.Property<string>("ShelterId")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("AvailableCapacity")
                         .HasColumnType("int");
 
-                    b.Property<int>("Capacity")
+                    b.Property<DateTime>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ManagedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ShelterName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TotalCapacity")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.HasKey("ShelterId");
+
+                    b.ToTable("Shelters");
+                });
+
+            modelBuilder.Entity("FYP_Project_II.Models.ShelterReport", b =>
+                {
+                    b.Property<string>("ShelterReportId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("AvailableCapacity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("GeneratedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Location")
@@ -312,16 +386,54 @@ namespace FYP_Project_II.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ResourceSummary")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ShelterId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TotalCapacity")
+                        .HasColumnType("int");
+
+                    b.HasKey("ShelterReportId");
+
+                    b.ToTable("ShelterReports");
+                });
+
+            modelBuilder.Entity("FYP_Project_II.Models.ShelterResource", b =>
+                {
+                    b.Property<string>("ShelterResourceId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResourceItemId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ShelterId")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("ShelterId");
+                    b.HasKey("ShelterResourceId");
 
-                    b.ToTable("Shelters");
+                    b.ToTable("ShelterResources");
                 });
 
             modelBuilder.Entity("FYP_Project_II.Models.SystemSettings", b =>

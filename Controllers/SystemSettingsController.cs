@@ -68,6 +68,7 @@ namespace FYP_Project_II.Controllers
             var user = await _userManager.GetUserAsync(User);
             var auditLog = new AuditLog
             {
+                Id = await AuditLog.GenerateNextIdAsync(_context),
                 Username = user?.UserName ?? "Unknown",
                 Name = user?.Name ?? "Unknown",
                 Action = "Update System Settings",

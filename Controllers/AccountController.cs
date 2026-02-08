@@ -165,10 +165,12 @@ namespace FYP_Project_II.Controllers
                 await _userManager.AddToRoleAsync(createdUser, request.Role);
 
                 // Log to audit
+                // Log to audit
                 var currentUserName = currentAppUser?.Name ?? "System";
                 currentUserId = currentAppUser?.UserName ?? "system";
                 _context.AuditLogs.Add(new AuditLog
                 {
+                    Id = await AuditLog.GenerateNextIdAsync(_context),
                     Username = currentUserId,
                     Name = currentUserName,
                     Action = "Create User",
@@ -325,6 +327,7 @@ namespace FYP_Project_II.Controllers
                 var currentUserName = User.FindFirst("Name")?.Value ?? "System";
                 _context.AuditLogs.Add(new AuditLog
                 {
+                    Id = await AuditLog.GenerateNextIdAsync(_context),
                     Username = currentUserId,
                     Name = currentUserName,
                     Action = "Update User",
@@ -354,6 +357,7 @@ namespace FYP_Project_II.Controllers
                 var currentUserName = User.FindFirst("Name")?.Value ?? "System";
                 _context.AuditLogs.Add(new AuditLog
                 {
+                    Id = await AuditLog.GenerateNextIdAsync(_context),
                     Username = currentUserId,
                     Name = currentUserName,
                     Action = "Delete User",

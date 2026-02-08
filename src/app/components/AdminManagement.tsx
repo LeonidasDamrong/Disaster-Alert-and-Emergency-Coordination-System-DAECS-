@@ -427,112 +427,120 @@ export const AdminManagement = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Edit User Dialog */}
-              <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Edit User</DialogTitle>
-                    <DialogDescription>Update user information</DialogDescription>
-                  </DialogHeader>
-                  {editingUser && (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>User ID</Label>
-                        <Input value={editingUser.userId} disabled className="bg-gray-50" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Full Name *</Label>
-                        <Input
-                          value={editingUser.name}
-                          onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                          placeholder="Enter full name"
-                          disabled={isEditingUser}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Email *</Label>
-                        <Input
-                          type="email"
-                          value={editingUser.email}
-                          onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                          placeholder="email@daecs.gov.my"
-                          disabled={isEditingUser}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Phone *</Label>
-                        <Input
-                          value={editingUser.phone}
-                          onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                          placeholder="+60..."
-                          disabled={isEditingUser}
-                        />
-                      </div>
-                      <Button
-                        onClick={handleUpdateUser}
-                        className="w-full"
-                        disabled={!editingUser.name || !editingUser.email || !editingUser.phone || isEditingUser}
-                      >
-                        {isEditingUser ? 'Updating...' : 'Update User'}
-                      </Button>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users
-                    .map((user) => (
-                      <TableRow key={user.id ?? user.userId}>
-                        <TableCell className="font-mono">{user.userId}</TableCell>
-                        <TableCell className="font-semibold">{user.name}</TableCell>
-                        <TableCell>
-                          <Badge className={getRoleBadgeColor(user.role)}>
-                            {user.role}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>{user.phone}</TableCell>
-                        <TableCell className="text-sm">
-                          {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-MY') : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {currentUser?.role === 'System Admin' || (currentUser?.role === 'Admin' && user.role !== 'System Admin' && user.role !== 'Admin') ? (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setEditingUser({ ...user })}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteUser(user)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : null}
-                        </TableCell>
+              {isLoadingUsers ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-sm text-gray-500">Loading users...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Edit User Dialog */}
+                  <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit User</DialogTitle>
+                        <DialogDescription>Update user information</DialogDescription>
+                      </DialogHeader>
+                      {editingUser && (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>User ID</Label>
+                            <Input value={editingUser.userId} disabled className="bg-gray-50" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Full Name *</Label>
+                            <Input
+                              value={editingUser.name}
+                              onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                              placeholder="Enter full name"
+                              disabled={isEditingUser}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Email *</Label>
+                            <Input
+                              type="email"
+                              value={editingUser.email}
+                              onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                              placeholder="email@daecs.gov.my"
+                              disabled={isEditingUser}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Phone *</Label>
+                            <Input
+                              value={editingUser.phone}
+                              onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                              placeholder="+60..."
+                              disabled={isEditingUser}
+                            />
+                          </div>
+                          <Button
+                            onClick={handleUpdateUser}
+                            className="w-full"
+                            disabled={!editingUser.name || !editingUser.email || !editingUser.phone || isEditingUser}
+                          >
+                            {isEditingUser ? 'Updating...' : 'Update User'}
+                          </Button>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {users
+                        .map((user) => (
+                          <TableRow key={user.id ?? user.userId}>
+                            <TableCell className="font-mono">{user.userId}</TableCell>
+                            <TableCell className="font-semibold">{user.name}</TableCell>
+                            <TableCell>
+                              <Badge className={getRoleBadgeColor(user.role)}>
+                                {user.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>{user.phone}</TableCell>
+                            <TableCell className="text-sm">
+                              {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-MY') : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {currentUser?.role === 'System Admin' || (currentUser?.role === 'Admin' && user.role !== 'System Admin' && user.role !== 'Admin') ? (
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setEditingUser({ ...user })}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

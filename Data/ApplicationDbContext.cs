@@ -9,6 +9,9 @@ namespace FYP_Project_II.Data
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Shelter> Shelters { get; set; }
+        public DbSet<Evacuee> Evacuees { get; set; }
+        public DbSet<ShelterResource> ShelterResources { get; set; }
+        public DbSet<ShelterReport> ShelterReports { get; set; }
         public DbSet<ResourceItem> Resources { get; set; }
         public DbSet<ResourceRequest> ResourceRequests { get; set; }
         public DbSet<SOSRequest> SOSRequests { get; set; }

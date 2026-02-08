@@ -50,8 +50,8 @@ namespace FYP_Project_II.Data
             // Check if other users already exist
             if (userManager.Users.Count() > 1)
             {
-                // Seed audit logs if empty
-                await SeedAuditLogsIfEmpty(dbContext);
+                // Ensure dummy data (including announcements) is seeded even if users exist
+                await SeedDummyDataAsync(dbContext);
                 return;
             }
 
@@ -153,9 +153,9 @@ namespace FYP_Project_II.Data
             {
                 var shelters = new[]
                 {
-                    new Shelter { ShelterId = "SHELTER001", Name = "Dewan Serbaguna Ampang", Location = "Ampang, Selangor", Capacity = 500, AvailableCapacity = 450, Status = "Open", CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new Shelter { ShelterId = "SHELTER002", Name = "SK Bukit Indah", Location = "Ampang, Selangor", Capacity = 300, AvailableCapacity = 100, Status = "Full", CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new Shelter { ShelterId = "SHELTER003", Name = "Masjid Jamek KL", Location = "Kuala Lumpur", Capacity = 200, AvailableCapacity = 200, Status = "Closed", CreatedAt = baseDate, UpdatedAt = baseDate }
+                    new Shelter { ShelterId = "SHELTER001", ShelterName = "Dewan Serbaguna Ampang", Address = "Ampang, Selangor", TotalCapacity = 500, AvailableCapacity = 450, Status = "Open", ManagedBy = "shelter001", RegisteredAt = baseDate, LastModifiedAt = baseDate },
+                    new Shelter { ShelterId = "SHELTER002", ShelterName = "SK Bukit Indah", Address = "Ampang, Selangor", TotalCapacity = 300, AvailableCapacity = 100, Status = "Full", ManagedBy = "shelter001", RegisteredAt = baseDate, LastModifiedAt = baseDate },
+                    new Shelter { ShelterId = "SHELTER003", ShelterName = "Masjid Jamek KL", Address = "Kuala Lumpur", TotalCapacity = 200, AvailableCapacity = 200, Status = "Closed", ManagedBy = "resource001", RegisteredAt = baseDate, LastModifiedAt = baseDate }
                 };
                 await dbContext.Shelters.AddRangeAsync(shelters);
                 Console.WriteLine("Seeded Shelters");

@@ -2,14 +2,14 @@ namespace FYP_Project_II.Models
 {
     public class ShelterReport
     {
-        public string ShelterReportId { get; set; }
-        public string ShelterId { get; set; }
-        public string Name { get; set; }
-        public string Location { get; set; }
-        public int Capacity { get; set; }
+        public string ShelterReportId { get; set; } = string.Empty;
+        public string ShelterId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+        public int TotalCapacity { get; set; }
         public int AvailableCapacity { get; set; }
-        public string Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string ResourceSummary { get; set; } = string.Empty; // JSON or comma-separated summary
+        public DateTime GeneratedAt { get; set; }
     }
 }

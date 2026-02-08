@@ -57,8 +57,8 @@ export const Dashboard = () => {
   const shelterData = mockShelters.map(s => ({
     name: s.name.split(' ').slice(0, 3).join(' '),
     occupancy: s.currentOccupancy,
-    capacity: s.capacity,
-    available: s.capacity - s.currentOccupancy
+    TotalCapacity: s.TotalCapacity,
+    available: s.TotalCapacity - s.currentOccupancy
   }));
 
   return (
@@ -122,7 +122,7 @@ export const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Shelter Occupancy Status</CardTitle>
-            <CardDescription>Current capacity utilization</CardDescription>
+            <CardDescription>Current TotalCapacity utilization</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>

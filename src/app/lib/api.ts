@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.MODE === 'production'
     ? '' // Production: same origin
     : 'http://localhost:5191'; // Development: ASP.NET Core dev server
 
-import type { UserRole, SystemSettings, Announcement } from './types';
+import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi } from './types';
 
 // API Client with JWT token support
 class ApiClient {
@@ -152,4 +152,125 @@ export const announcementApi = {
     create: (announcement: Partial<Announcement>) => apiClient.post<Announcement>('/api/announcements', announcement),
     update: (id: string, announcement: Partial<Announcement>) => apiClient.put<void>(`/api/announcements/${id}`, announcement),
     delete: (id: string) => apiClient.delete<void>(`/api/announcements/${id}`)
+};
+
+// Map backend shelter to UI Shelter (without evacuees/resources - load separately)
+function mapShelterApiToShelter(s: ShelterApi, evacuees: Evacuee[] = [], resources: string[] = []): Shelter {
+    return {
+        id: s.shelterId,
+        name: s.shelterName,
+        location: s.address,
+        TotalCapacity: s.totalCapacity,
+        currentOccupancy: s.totalCapacity - s.availableCapacity,
+        status: (s.status as Shelter['status']) || 'Open',
+        manager: s.managedBy ?? '',
+        phone: '',
+        resources,
+        evacuees,
+        createdAt: s.registeredAt
+    };
+}
+
+function mapEvacueeApiToEvacuee(e: EvacueeApi): Evacuee {
+    return {
+        id: e.evacueeId,
+        name: e.evacueeName,
+        age: e.evacueeAge,
+        gender: e.evacueeGender,
+        phone: e.evacueePhone ?? '',
+        checkinDate: e.evacueeCheckInDate,
+        medicalNeeds: e.evacueeMedicalNeeds ?? undefined,
+        idNumber: e.evacueeIdNumber ?? undefined
+    };
+}
+
+export const shelterApi = {
+    getAll: async (): Promise<Shelter[]> => {
+        const list = await apiClient.get<ShelterApi[]>('/api/shelters');
+        return list.map(s => mapShelterApiToShelter(s));
+    },
+
+    getById: (shelterId: string) =>
+        apiClient.get<ShelterApi>(`/api/shelters/${encodeURIComponent(shelterId)}`),
+
+    getWithDetails: async (shelterId: string): Promise<{ shelter: Shelter; evacuees: Evacuee[]; resources: ShelterResourceApi[] }> => {
+        const raw = await apiClient.get<{ shelter: ShelterApi; evacuees: EvacueeApi[]; resources: ShelterResourceApi[] }>(
+            `/api/shelters/${encodeURIComponent(shelterId)}/full`
+        );
+        const evacuees = raw.evacuees.map(mapEvacueeApiToEvacuee);
+        const resources = raw.resources.map(r => `${r.resourceType}: ${r.quantity}`);
+        return {
+            shelter: mapShelterApiToShelter(raw.shelter, evacuees, resources),
+            evacuees,
+            resources: raw.resources
+        };
+    },
+
+    create: (data: { shelterName: string; address: string; totalCapacity: number; status?: string; managedBy?: string | null }) =>
+        apiClient.post<ShelterApi>('/api/shelters', {
+            shelterName: data.shelterName,
+            address: data.address,
+            totalCapacity: data.totalCapacity,
+            availableCapacity: data.totalCapacity,
+            status: data.status ?? 'Open',
+            managedBy: data.managedBy ?? null
+        }),
+
+    update: (shelterId: string, data: Partial<ShelterApi>) =>
+        apiClient.put<void>(`/api/shelters/${encodeURIComponent(shelterId)}`, data),
+
+    delete: (shelterId: string) =>
+        apiClient.delete<void>(`/api/shelters/${encodeURIComponent(shelterId)}`),
+
+    getEvacuees: async (shelterId: string, activeOnly = true): Promise<Evacuee[]> => {
+        const list = await apiClient.get<EvacueeApi[]>(
+            `/api/shelters/${encodeURIComponent(shelterId)}/evacuees?activeOnly=${activeOnly}`
+        );
+        return list.map(mapEvacueeApiToEvacuee);
+    },
+
+    registerEvacuee: (shelterId: string, data: { evacueeName: string; evacueeGender: string; evacueeAge: number; evacueePhone?: string; evacueeIdNumber?: string; evacueeMedicalNeeds?: string }) =>
+        apiClient.post<EvacueeApi>(`/api/shelters/${encodeURIComponent(shelterId)}/evacuees`, {
+            evacueeId: '',
+            shelterId,
+            evacueeName: data.evacueeName,
+            evacueeIdNumber: data.evacueeIdNumber ?? null,
+            evacueeGender: data.evacueeGender,
+            evacueeAge: data.evacueeAge,
+            evacueePhone: data.evacueePhone ?? null,
+            evacueeMedicalNeeds: data.evacueeMedicalNeeds ?? null,
+            evacueeCheckInDate: new Date().toISOString(),
+            evacueeCheckOutDate: null
+        }),
+
+    checkoutEvacuee: (shelterId: string, evacueeId: string) =>
+        apiClient.post<void>(`/api/shelters/${encodeURIComponent(shelterId)}/evacuees/${encodeURIComponent(evacueeId)}/checkout`),
+
+    getResources: (shelterId: string) =>
+        apiClient.get<ShelterResourceApi[]>(`/api/shelters/${encodeURIComponent(shelterId)}/resources`),
+
+    addResource: (shelterId: string, data: { resourceType: string; quantity: number; resourceItemId?: string }) =>
+        apiClient.post<ShelterResourceApi>(`/api/shelters/${encodeURIComponent(shelterId)}/resources`, {
+            shelterId,
+            resourceType: data.resourceType,
+            quantity: data.quantity,
+            resourceItemId: data.resourceItemId ?? null
+        }),
+
+    updateResource: (shelterId: string, resourceId: string, data: { resourceType: string; quantity: number }) =>
+        apiClient.put<void>(`/api/shelters/${encodeURIComponent(shelterId)}/resources/${encodeURIComponent(resourceId)}`, {
+            shelterResourceId: resourceId,
+            shelterId,
+            resourceType: data.resourceType,
+            quantity: data.quantity
+        }),
+
+    deleteResource: (shelterId: string, resourceId: string) =>
+        apiClient.delete<void>(`/api/shelters/${encodeURIComponent(shelterId)}/resources/${encodeURIComponent(resourceId)}`),
+
+    getReports: (shelterId: string) =>
+        apiClient.get<ShelterReportApi[]>(`/api/shelters/${encodeURIComponent(shelterId)}/reports`),
+
+    generateReport: (shelterId: string) =>
+        (apiClient.post)<ShelterReportApi>(`/api/shelters/${encodeURIComponent(shelterId)}/reports`),
 };
