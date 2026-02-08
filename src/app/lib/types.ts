@@ -132,6 +132,19 @@ export interface ShelterReportApi {
   generatedAt: string;
 }
 
+export interface ShelterRegistrationRequestApi {
+  requestId: string;
+  requestedBy: string;
+  shelterName: string;
+  address: string;
+  totalCapacity: number;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  requestedAt: string;
+  processedAt?: string | null;
+  processedBy?: string | null;
+  rejectionReason?: string | null;
+}
+
 // Resource Types
 export type ResourceStatus = 'Pending' | 'Approved' | 'Rejected' | 'Delivered';
 export type ResourceCategory = 'Food' | 'Medical' | 'Shelter Supplies' | 'Equipment' | 'Transport';

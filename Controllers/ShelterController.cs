@@ -8,6 +8,11 @@ using System.Security.Claims;
 
 namespace FYP_Project_II.Controllers
 {
+    public class RejectRequestDto
+    {
+        public string? RejectionReason { get; set; }
+    }
+
     [Route("api/shelters")]
     [ApiController]
     public class ShelterController : ControllerBase
@@ -42,6 +47,99 @@ namespace FYP_Project_II.Controllers
                 .FirstOrDefaultAsync(s => s.ManagedBy == userName);
             if (shelter == null) return NotFound();
             return shelter;
+        }
+
+        // ---------- Shelter Registration Requests ----------
+        [HttpGet("registration-requests")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<ShelterRegistrationRequest>>> GetRegistrationRequests([FromQuery] bool myOnly = false)
+        {
+            var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
+            if (string.IsNullOrEmpty(userName)) return Unauthorized();
+
+            var query = _context.ShelterRegistrationRequests.AsQueryable();
+            if (myOnly)
+                query = query.Where(r => r.RequestedBy == userName);
+            return await query.OrderByDescending(r => r.RequestedAt).ToListAsync();
+        }
+
+        [HttpPost("registration-requests")]
+        [Authorize(Roles = "Shelter Manager")]
+        public async Task<ActionResult<ShelterRegistrationRequest>> CreateRegistrationRequest(ShelterRegistrationRequest request)
+        {
+            var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
+            if (string.IsNullOrEmpty(userName)) return Unauthorized();
+
+            var hasShelter = await _context.Shelters.AnyAsync(s => s.ManagedBy == userName);
+            if (hasShelter)
+                return BadRequest(new { message = "You are already assigned to a shelter." });
+
+            request.RequestId = await GenerateNextRequestIdAsync();
+            request.RequestedBy = userName;
+            request.Status = "Pending";
+            request.RequestedAt = DateTime.UtcNow;
+            request.ProcessedAt = null;
+            request.ProcessedBy = null;
+            request.RejectionReason = null;
+
+            _context.ShelterRegistrationRequests.Add(request);
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Shelter Registration Request", $"Requested registration: {request.ShelterName}");
+
+            return CreatedAtAction(nameof(GetRegistrationRequests), new { id = request.RequestId }, request);
+        }
+
+        [HttpPost("registration-requests/{requestId}/approve")]
+        [Authorize(Roles = "Admin, System Admin")]
+        public async Task<ActionResult<Shelter>> ApproveRegistrationRequest(string requestId)
+        {
+            var req = await _context.ShelterRegistrationRequests.FindAsync(requestId);
+            if (req == null) return NotFound();
+            if (req.Status != "Pending")
+                return BadRequest(new { message = "Request has already been processed." });
+
+            var shelter = new Shelter
+            {
+                ShelterId = await GenerateNextShelterIdAsync(),
+                ShelterName = req.ShelterName,
+                Address = req.Address,
+                TotalCapacity = req.TotalCapacity,
+                AvailableCapacity = req.TotalCapacity,
+                Status = "Open",
+                ManagedBy = req.RequestedBy,
+                RegisteredAt = DateTime.UtcNow,
+                LastModifiedAt = DateTime.UtcNow
+            };
+            _context.Shelters.Add(shelter);
+
+            req.Status = "Approved";
+            req.ProcessedAt = DateTime.UtcNow;
+            req.ProcessedBy = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
+
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Approve Shelter Registration", $"Approved request {requestId}, created shelter {shelter.ShelterId}");
+
+            return Ok(shelter);
+        }
+
+        [HttpPost("registration-requests/{requestId}/reject")]
+        [Authorize(Roles = "Admin, System Admin")]
+        public async Task<IActionResult> RejectRegistrationRequest(string requestId, [FromBody] RejectRequestDto? dto)
+        {
+            var req = await _context.ShelterRegistrationRequests.FindAsync(requestId);
+            if (req == null) return NotFound();
+            if (req.Status != "Pending")
+                return BadRequest(new { message = "Request has already been processed." });
+
+            req.Status = "Rejected";
+            req.ProcessedAt = DateTime.UtcNow;
+            req.ProcessedBy = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
+            req.RejectionReason = dto?.RejectionReason;
+
+            await _context.SaveChangesAsync();
+            await LogAuditAsync("Reject Shelter Registration", $"Rejected request {requestId}");
+
+            return NoContent();
         }
 
         [HttpGet("{shelterId}")]
@@ -342,12 +440,21 @@ namespace FYP_Project_II.Controllers
         {
             var last = await context.Shelters.OrderByDescending(s => s.ShelterId).FirstOrDefaultAsync();
             int next = 1;
-            if (last != null && last.ShelterId.StartsWith("SHELTER", StringComparison.OrdinalIgnoreCase))
+            if (last != null && last.ShelterId.StartsWith("SHEL", StringComparison.OrdinalIgnoreCase))
             {
-                if (int.TryParse(last.ShelterId.Length >= 7 ? last.ShelterId.Substring(7) : null, out int n))
+                // Extract number part: "SHEL001" -> "001"
+                string numberPart = last.ShelterId.Length >= 7 ? last.ShelterId.Substring(4) : "000";
+                // Handle cases where ID might be "SHELTER001" (old format) by taking only last 3 digits if possible, or just resetting if format is mixed
+                if (last.ShelterId.StartsWith("SHELTER", StringComparison.OrdinalIgnoreCase))
+                {
+                     if (int.TryParse(last.ShelterId.Substring(7), out int n)) next = n + 1;
+                }
+                else if (int.TryParse(numberPart, out int n))
+                {
                     next = n + 1;
+                }
             }
-            return $"SHELTER{next:D3}";
+            return $"SHEL{next:D3}";
         }
 
         private async Task<string> GenerateNextShelterIdAsync()
@@ -404,6 +511,23 @@ namespace FYP_Project_II.Controllers
         private async Task<string> GenerateNextShelterReportIdAsync()
         {
             return await GenerateNextShelterReportIdAsync(_context);
+        }
+
+        private static async Task<string> GenerateNextRequestIdAsync(ApplicationDbContext context)
+        {
+            var last = await context.ShelterRegistrationRequests.OrderByDescending(r => r.RequestId).FirstOrDefaultAsync();
+            int next = 1;
+            if (last != null && last.RequestId.StartsWith("SRR", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(last.RequestId.Length >= 3 ? last.RequestId.Substring(3) : null, out int n))
+                    next = n + 1;
+            }
+            return $"SRR{next:D3}";
+        }
+
+        private async Task<string> GenerateNextRequestIdAsync()
+        {
+            return await GenerateNextRequestIdAsync(_context);
         }
 
         private async Task LogAuditAsync(string action, string details)

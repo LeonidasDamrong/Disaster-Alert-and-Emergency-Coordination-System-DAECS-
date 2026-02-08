@@ -107,7 +107,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] sticky top-[73px]">
+        <aside className="w-64 bg-white border-r border-gray-200 fixed left-0 top-[73px] h-[calc(100vh-73px)] overflow-y-auto z-40">
           <nav className="p-4 space-y-1">
             {filteredNavItems.map((item) => (
               <Link key={item.path} to={item.path}>
@@ -127,7 +127,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 ml-64">
           {children}
         </main>
       </div>

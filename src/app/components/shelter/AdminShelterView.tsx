@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -8,11 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { Home as HomeIcon, Users, MapPin, Plus, Printer, Loader2, LogOut, Pencil, Trash2, FileCheck } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Home as HomeIcon, Users, MapPin, Plus, Printer, Loader2, Pencil, Trash2, FileCheck, Check, X } from 'lucide-react';
 import { Shelter, ShelterStatus } from '../../lib/types';
+import type { ShelterRegistrationRequestApi } from '../../lib/types';
 import { shelterApi } from '../../lib/api';
 import { authApi } from '../../lib/api';
 import { toast } from 'sonner';
@@ -32,12 +34,13 @@ export const AdminShelterView = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [editShelter, setEditShelter] = useState<Shelter | null>(null);
   const [deleteShelter, setDeleteShelter] = useState<Shelter | null>(null);
-  const [newEvacuee, setNewEvacuee] = useState({
-    name: '', age: '', gender: 'Male', phone: '', medicalNeeds: '', idNumber: ''
-  });
   const [form, setForm] = useState({
     shelterName: '', address: '', totalCapacity: 100, status: 'Open' as string, managedBy: '' as string | null
   });
+  const [registrationRequests, setRegistrationRequests] = useState<ShelterRegistrationRequestApi[]>([]);
+  const [rejectDialog, setRejectDialog] = useState<{ requestId: string; request: ShelterRegistrationRequestApi } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   const shelterManagers = users.filter(u => u.role === 'Shelter Manager');
 
@@ -63,10 +66,20 @@ export const AdminShelterView = () => {
     }
   }, []);
 
+  const loadRegistrationRequests = useCallback(async () => {
+    try {
+      const list = await shelterApi.getRegistrationRequests(false);
+      setRegistrationRequests(list);
+    } catch {
+      setRegistrationRequests([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadShelters();
     loadUsers();
-  }, [loadShelters, loadUsers]);
+    loadRegistrationRequests();
+  }, [loadShelters, loadUsers, loadRegistrationRequests]);
 
   const loadShelterDetails = useCallback(async (shelterId: string) => {
     setDetailsLoading(true);
@@ -137,6 +150,30 @@ export const AdminShelterView = () => {
     }
   };
 
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      await shelterApi.approveRegistrationRequest(requestId);
+      toast.success('Request approved. Shelter created.');
+      await loadRegistrationRequests();
+      await loadShelters();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to approve');
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!rejectDialog) return;
+    try {
+      await shelterApi.rejectRegistrationRequest(rejectDialog.requestId, rejectReason || undefined);
+      toast.success('Request rejected');
+      setRejectDialog(null);
+      setRejectReason('');
+      await loadRegistrationRequests();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to reject');
+    }
+  };
+
   const openEdit = (shelter: Shelter) => {
     setEditShelter(shelter);
     setForm({
@@ -146,41 +183,6 @@ export const AdminShelterView = () => {
       status: shelter.status,
       managedBy: shelter.manager || null
     });
-  };
-
-  const handleRegisterEvacuee = async (shelterId: string) => {
-    const age = parseInt(newEvacuee.age, 10);
-    if (!newEvacuee.name || !newEvacuee.phone || isNaN(age)) {
-      toast.error('Please fill name, age and phone');
-      return;
-    }
-    try {
-      await shelterApi.registerEvacuee(shelterId, {
-        evacueeName: newEvacuee.name,
-        evacueeAge: age,
-        evacueeGender: newEvacuee.gender,
-        evacueePhone: newEvacuee.phone,
-        evacueeIdNumber: newEvacuee.idNumber || undefined,
-        evacueeMedicalNeeds: newEvacuee.medicalNeeds || undefined
-      });
-      setNewEvacuee({ name: '', age: '', gender: 'Male', phone: '', medicalNeeds: '', idNumber: '' });
-      toast.success('Evacuee registered successfully');
-      await loadShelterDetails(shelterId);
-      await loadShelters();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to register evacuee');
-    }
-  };
-
-  const handleCheckoutEvacuee = async (shelterId: string, evacueeId: string) => {
-    try {
-      await shelterApi.checkoutEvacuee(shelterId, evacueeId);
-      toast.success('Evacuee checked out');
-      await loadShelterDetails(shelterId);
-      await loadShelters();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to check out evacuee');
-    }
   };
 
   const handleGenerateReport = async (shelterId: string, shelterName: string) => {
@@ -241,7 +243,9 @@ export const AdminShelterView = () => {
                   <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {shelterManagers.map(m => (<SelectItem key={m.userId} value={m.userId}>{m.name} ({m.userId})</SelectItem>))}
+                    {shelterManagers
+                      .filter(m => !shelters.some(s => s.manager === m.userId))
+                      .map(m => (<SelectItem key={m.userId} value={m.userId}>{m.name} ({m.userId})</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -254,12 +258,110 @@ export const AdminShelterView = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><FileCheck className="h-5 w-5" /> Shelter registration requests</CardTitle>
-          <CardDescription>Approve shelter registration requests from shelter managers</CardDescription>
+          <CardDescription>
+            Manage shelter registration requests
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No pending requests.</p>
+          <Tabs defaultValue="pending" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="pending">Pending Requests</TabsTrigger>
+              <TabsTrigger value="history">Request History</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="pending">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Request ID</TableHead>
+                    <TableHead>Shelter name</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Capacity</TableHead>
+                    <TableHead>Requested by</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[140px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {registrationRequests.filter(r => r.status === 'Pending').map((req) => (
+                    <TableRow key={req.requestId}>
+                      <TableCell className="font-mono text-sm">{req.requestId}</TableCell>
+                      <TableCell>{req.shelterName}</TableCell>
+                      <TableCell className="max-w-[180px] truncate">{req.address}</TableCell>
+                      <TableCell>{req.totalCapacity}</TableCell>
+                      <TableCell>{req.requestedBy}</TableCell>
+                      <TableCell className="text-sm">{new Date(req.requestedAt).toLocaleDateString('en-MY')}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">Pending</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" className="text-green-600" onClick={() => handleApproveRequest(req.requestId)} title="Approve"><Check className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="sm" className="text-red-600" onClick={() => setRejectDialog({ requestId: req.requestId, request: req })} title="Reject"><X className="h-4 w-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {registrationRequests.filter(r => r.status === 'Pending').length === 0 && (
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No pending requests</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TabsContent>
+
+            <TabsContent value="history">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Request ID</TableHead>
+                    <TableHead>Shelter name</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Capacity</TableHead>
+                    <TableHead>Requested by</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {registrationRequests.filter(r => r.status !== 'Pending').map((req) => (
+                    <TableRow key={req.requestId}>
+                      <TableCell className="font-mono text-sm">{req.requestId}</TableCell>
+                      <TableCell>{req.shelterName}</TableCell>
+                      <TableCell className="max-w-[180px] truncate">{req.address}</TableCell>
+                      <TableCell>{req.totalCapacity}</TableCell>
+                      <TableCell>{req.requestedBy}</TableCell>
+                      <TableCell className="text-sm">{new Date(req.requestedAt).toLocaleDateString('en-MY')}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={req.status === 'Approved' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
+                          {req.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {registrationRequests.filter(r => r.status !== 'Pending').length === 0 && (
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No historical requests</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={!!rejectDialog} onOpenChange={(o) => !o && setRejectDialog(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Reject registration request</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+            {rejectDialog && <p className="text-sm text-muted-foreground">Reject {rejectDialog.request.shelterName}?</p>}
+            <div className="grid gap-2"><Label>Reason (optional)</Label><Input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason for rejection" /></div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleRejectRequest}>Reject</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-6"><p className="text-sm text-gray-600">Total Shelters</p><p className="text-3xl font-bold mt-1">{shelters.length}</p></CardContent></Card>
@@ -300,37 +402,40 @@ export const AdminShelterView = () => {
                 <div><p className="text-sm text-gray-600 mb-2">Resources</p>{current.resources.length === 0 ? <span className="text-sm text-gray-500">None</span> : <div className="flex flex-wrap gap-2">{current.resources.map((r, i) => <Badge key={i} variant="outline">{r}</Badge>)}</div>}</div>
                 <div className="flex gap-2 flex-wrap">
                   <Dialog onOpenChange={(open) => open && loadShelterDetails(shelter.id)}>
-                    <DialogTrigger asChild><Button variant="outline" size="sm" className="gap-2"><Users className="h-4 w-4" />View Evacuees ({current.evacuees.length})</Button></DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogTrigger asChild><Button variant="outline" size="sm" className="gap-2"><Users className="h-4 w-4" />View Evacuees ({current.evacuees.length > 0 ? current.evacuees.length : current.currentOccupancy})</Button></DialogTrigger>
+                    <DialogContent className="w-[90vw] max-w-none sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
                       <DialogHeader><DialogTitle>Evacuees at {current.name}</DialogTitle></DialogHeader>
                       {detailsLoading ? <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-gray-500" /></div> : (
                         <div className="space-y-4">
-                          <Card>
-                            <CardHeader><CardTitle>Register new evacuee</CardTitle></CardHeader>
-                            <CardContent>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Name *</Label><Input value={newEvacuee.name} onChange={(e) => setNewEvacuee({ ...newEvacuee, name: e.target.value })} /></div>
-                                <div className="space-y-2"><Label>Age *</Label><Input type="number" value={newEvacuee.age} onChange={(e) => setNewEvacuee({ ...newEvacuee, age: e.target.value })} /></div>
-                                <div className="space-y-2"><Label>Gender *</Label><Input value={newEvacuee.gender} onChange={(e) => setNewEvacuee({ ...newEvacuee, gender: e.target.value })} /></div>
-                                <div className="space-y-2"><Label>Phone *</Label><Input value={newEvacuee.phone} onChange={(e) => setNewEvacuee({ ...newEvacuee, phone: e.target.value })} /></div>
-                                <div className="col-span-2 space-y-2"><Label>Medical (optional)</Label><Input value={newEvacuee.medicalNeeds} onChange={(e) => setNewEvacuee({ ...newEvacuee, medicalNeeds: e.target.value })} /></div>
-                              </div>
-                              <Button className="mt-4 w-full gap-2" onClick={() => handleRegisterEvacuee(shelter.id)} disabled={!newEvacuee.name || !newEvacuee.age || !newEvacuee.phone || current.status === 'Full'}><Plus className="h-4 w-4" />Register evacuee</Button>
-                            </CardContent>
-                          </Card>
-                          <Table>
-                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Age</TableHead><TableHead>Gender</TableHead><TableHead>Phone</TableHead><TableHead>Check-in</TableHead><TableHead className="w-[80px]">Action</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                              {(selectedShelter?.id === shelter.id ? selectedShelter : current).evacuees.map((ev) => (
-                                <TableRow key={ev.id}>
-                                  <TableCell className="font-medium">{ev.name}</TableCell><TableCell>{ev.age}</TableCell><TableCell>{ev.gender}</TableCell><TableCell>{ev.phone}</TableCell>
-                                  <TableCell className="text-sm">{new Date(ev.checkinDate).toLocaleString('en-MY')}</TableCell>
-                                  <TableCell><Button variant="ghost" size="sm" className="text-amber-600" onClick={() => handleCheckoutEvacuee(shelter.id, ev.id)} title="Check out"><LogOut className="h-4 w-4" /></Button></TableCell>
+                          <div className="border rounded-md">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>ID Number</TableHead>
+                                  <TableHead>Age</TableHead>
+                                  <TableHead>Gender</TableHead>
+                                  <TableHead>Phone</TableHead>
+                                  <TableHead>Medical</TableHead>
+                                  <TableHead>Check-in</TableHead>
                                 </TableRow>
-                              ))}
-                              {current.evacuees.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-gray-500 py-8">No evacuees</TableCell></TableRow>}
-                            </TableBody>
-                          </Table>
+                              </TableHeader>
+                              <TableBody>
+                                {(selectedShelter?.id === shelter.id ? selectedShelter : current).evacuees.map((ev) => (
+                                  <TableRow key={ev.id}>
+                                    <TableCell className="font-medium">{ev.name}</TableCell>
+                                    <TableCell>{ev.idNumber || '-'}</TableCell>
+                                    <TableCell>{ev.age}</TableCell>
+                                    <TableCell>{ev.gender}</TableCell>
+                                    <TableCell>{ev.phone}</TableCell>
+                                    <TableCell>{ev.medicalNeeds || '-'}</TableCell>
+                                    <TableCell className="text-sm">{new Date(ev.checkinDate).toLocaleString('en-MY')}</TableCell>
+                                  </TableRow>
+                                ))}
+                                {current.evacuees.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-gray-500 py-8">No evacuees</TableCell></TableRow>}
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
                       )}
                     </DialogContent>
@@ -343,15 +448,36 @@ export const AdminShelterView = () => {
         })}
       </div>
 
-      <AlertDialog open={!!deleteShelter} onOpenChange={(o) => !o && setDeleteShelter(null)}>
+      <AlertDialog open={!!deleteShelter} onOpenChange={(o) => { if (!o) { setDeleteShelter(null); setDeleteConfirmation(''); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete shelter?</AlertDialogTitle>
-            <AlertDialogDescription>Delete {deleteShelter?.name}. This cannot be undone. Ensure no active evacuees.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Delete {deleteShelter?.name}. This cannot be undone. Ensure no active evacuees.
+            </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteShelter && (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>To confirm, type <span className="font-mono font-bold select-all">{deleteShelter.id}</span> below:</Label>
+                <Input
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder={deleteShelter.id}
+                  className="font-mono"
+                />
+              </div>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteShelter} className="bg-red-600">Delete</AlertDialogAction>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteShelter}
+              disabled={deleteConfirmation !== deleteShelter?.id}
+            >
+              Delete
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -375,7 +501,9 @@ export const AdminShelterView = () => {
                   <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {shelterManagers.map(m => (<SelectItem key={m.userId} value={m.userId}>{m.name} ({m.userId})</SelectItem>))}
+                    {shelterManagers
+                      .filter(m => !shelters.some(s => s.manager === m.userId && s.id !== editShelter.id))
+                      .map(m => (<SelectItem key={m.userId} value={m.userId}>{m.name} ({m.userId})</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>

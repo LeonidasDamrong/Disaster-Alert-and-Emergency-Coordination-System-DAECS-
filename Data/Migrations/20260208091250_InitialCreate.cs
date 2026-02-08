@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace FYP_Project_II.Migrations
+namespace FYP_Project_II.Data.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -157,6 +157,26 @@ namespace FYP_Project_II.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Resources", x => x.ResourceItemId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ShelterRegistrationRequests",
+                columns: table => new
+                {
+                    RequestId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    RequestedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ShelterName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalCapacity = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ProcessedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ProcessedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RejectionReason = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ShelterRegistrationRequests", x => x.RequestId);
                 });
 
             migrationBuilder.CreateTable(
@@ -428,6 +448,9 @@ namespace FYP_Project_II.Migrations
 
             migrationBuilder.DropTable(
                 name: "Resources");
+
+            migrationBuilder.DropTable(
+                name: "ShelterRegistrationRequests");
 
             migrationBuilder.DropTable(
                 name: "ShelterReports");

@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.MODE === 'production'
     ? '' // Production: same origin
     : 'http://localhost:5191'; // Development: ASP.NET Core dev server
 
-import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi } from './types';
+import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi, ShelterRegistrationRequestApi } from './types';
 
 // API Client with JWT token support
 class ApiClient {
@@ -283,4 +283,24 @@ export const shelterApi = {
 
     generateReport: (shelterId: string) =>
         (apiClient.post)<ShelterReportApi>(`/api/shelters/${encodeURIComponent(shelterId)}/reports`),
+
+    getRegistrationRequests: (myOnly = false) =>
+        apiClient.get<ShelterRegistrationRequestApi[]>(`/api/shelters/registration-requests?myOnly=${myOnly}`),
+
+    createRegistrationRequest: (data: { shelterName: string; address: string; totalCapacity: number }) =>
+        apiClient.post<ShelterRegistrationRequestApi>('/api/shelters/registration-requests', {
+            requestId: '',
+            requestedBy: '',
+            shelterName: data.shelterName,
+            address: data.address,
+            totalCapacity: data.totalCapacity,
+            status: 'Pending',
+            requestedAt: new Date().toISOString(),
+        }),
+
+    approveRegistrationRequest: (requestId: string) =>
+        apiClient.post<Shelter>(`/api/shelters/registration-requests/${encodeURIComponent(requestId)}/approve`),
+
+    rejectRegistrationRequest: (requestId: string, rejectionReason?: string) =>
+        apiClient.post<void>(`/api/shelters/registration-requests/${encodeURIComponent(requestId)}/reject`, { rejectionReason: rejectionReason ?? null }),
 };

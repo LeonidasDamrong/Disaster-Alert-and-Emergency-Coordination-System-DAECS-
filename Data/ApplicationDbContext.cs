@@ -12,6 +12,7 @@ namespace FYP_Project_II.Data
         public DbSet<Evacuee> Evacuees { get; set; }
         public DbSet<ShelterResource> ShelterResources { get; set; }
         public DbSet<ShelterReport> ShelterReports { get; set; }
+        public DbSet<ShelterRegistrationRequest> ShelterRegistrationRequests { get; set; }
         public DbSet<ResourceItem> Resources { get; set; }
         public DbSet<ResourceRequest> ResourceRequests { get; set; }
         public DbSet<SOSRequest> SOSRequests { get; set; }

@@ -49,7 +49,7 @@ if (Test-Path "Data/Migrations") {
 
 Write-Host ""
 Write-Host "Adding new migration (InitialCreate)..." -ForegroundColor Yellow
-dotnet ef migrations add InitialCreate
+dotnet ef migrations add InitialCreate --output-dir Data/Migrations
 
 Write-Host ""
 Write-Host "Recreating database with migrations..." -ForegroundColor Yellow

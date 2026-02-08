@@ -39,7 +39,7 @@ export const AdminManagement = () => {
     name: '',
     role: 'First Responder' as UserRole,
     email: '',
-    phone: ''
+    phone: '+60'
   });
 
   const [newAnnouncement, setNewAnnouncement] = useState({
@@ -48,6 +48,9 @@ export const AdminManagement = () => {
     priority: 'Low' as 'Low' | 'Medium' | 'High',
     expiresAt: ''
   });
+
+  const [deleteUserDialog, setDeleteUserDialog] = useState<User | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   // Fetch users, roles, audit logs, and settings
   useEffect(() => {
@@ -115,11 +118,15 @@ export const AdminManagement = () => {
     }
   }, [roles]);
 
-  // Auto-generate User ID when role changes during user creation
+  // Auto-generate User ID and Email when role changes during user creation
   useEffect(() => {
     if (isDialogOpen && newUser.role) {
       authApi.getNextUserId(newUser.role)
-        .then((res) => setNewUser((prev) => ({ ...prev, userId: res.nextUserId })))
+        .then((res) => setNewUser((prev) => ({
+          ...prev,
+          userId: res.nextUserId,
+          email: `${res.nextUserId.toLowerCase()}@daecs.gov.my`
+        })))
         .catch(() => { });
     }
   }, [isDialogOpen, newUser.role]);
@@ -149,7 +156,7 @@ export const AdminManagement = () => {
         name: '',
         role: 'First Responder',
         email: '',
-        phone: ''
+        phone: '+60'
       });
 
       // Close dialog and show success message
@@ -206,10 +213,17 @@ export const AdminManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (user: User) => {
-    if (!confirm(`Are you sure you want to delete user "${user.name}" (${user.userId})?`)) return;
+  const handleDeleteUser = (user: User) => {
+    setDeleteUserDialog(user);
+    setDeleteConfirmation('');
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteUserDialog) return;
+    if (deleteConfirmation !== deleteUserDialog.userId) return;
+
     try {
-      await authApi.deleteUser(user.userId);
+      await authApi.deleteUser(deleteUserDialog.userId);
       const updatedUsers = await authApi.getAllUsers();
       setUsers(updatedUsers);
 
@@ -218,6 +232,7 @@ export const AdminManagement = () => {
       setAuditLogs(updatedAuditLogs);
 
       toast.success('User deleted successfully');
+      setDeleteUserDialog(null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
       toast.error(errorMessage);
@@ -408,7 +423,18 @@ export const AdminManagement = () => {
                           <Label>Phone *</Label>
                           <Input
                             value={newUser.phone}
-                            onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '+6') {
+                                setNewUser({ ...newUser, phone: '+60' });
+                                return;
+                              }
+                              if (!val.startsWith('+60')) return;
+                              const numPart = val.substring(3);
+                              if (/^\d*$/.test(numPart)) {
+                                setNewUser({ ...newUser, phone: val });
+                              }
+                            }}
                             placeholder="+60..."
                             disabled={isCreatingUser}
                           />
@@ -485,6 +511,44 @@ export const AdminManagement = () => {
                       )}
                     </DialogContent>
                   </Dialog>
+                  {/* Delete User Confirmation Dialog */}
+                  <Dialog open={!!deleteUserDialog} onOpenChange={(open) => !open && setDeleteUserDialog(null)}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Delete User</DialogTitle>
+                        <DialogDescription>
+                          This action cannot be undone. This will permanently delete the user account.
+                        </DialogDescription>
+                      </DialogHeader>
+                      {deleteUserDialog && (
+                        <div className="space-y-4 py-2">
+                          <div className="p-3 bg-red-50 text-red-800 rounded-md text-sm">
+                            You are about to delete user <strong>{deleteUserDialog.name}</strong> ({deleteUserDialog.userId}).
+                          </div>
+                          <div className="space-y-2">
+                            <Label>To confirm, type <span className="font-mono font-bold select-all">{deleteUserDialog.userId}</span> below:</Label>
+                            <Input
+                              value={deleteConfirmation}
+                              onChange={(e) => setDeleteConfirmation(e.target.value)}
+                              placeholder={deleteUserDialog.userId}
+                              className="font-mono"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setDeleteUserDialog(null)}>Cancel</Button>
+                            <Button
+                              variant="destructive"
+                              disabled={deleteConfirmation !== deleteUserDialog.userId}
+                              onClick={confirmDeleteUser}
+                            >
+                              Delete User
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+
                   <Table>
                     <TableHeader>
                       <TableRow>
