@@ -11,5 +11,9 @@ namespace FYP_Project_II.Models
         public string? ManagedBy { get; set; }
         public DateTime RegisteredAt { get; set; }
         public DateTime LastModifiedAt { get; set; }
+        
+        // Navigation properties
+        public ICollection<ShelterResource> ShelterResources { get; set; } = new List<ShelterResource>();
+        public ICollection<Evacuee> Evacuees { get; set; } = new List<Evacuee>();
     }
 }

@@ -13,6 +13,8 @@ namespace FYP_Project_II.Controllers
         public string? RejectionReason { get; set; }
     }
 
+
+
     [Route("api/shelters")]
     [ApiController]
     public class ShelterController : ControllerBase
@@ -31,6 +33,8 @@ namespace FYP_Project_II.Controllers
         public async Task<ActionResult<IEnumerable<Shelter>>> GetShelters()
         {
             return await _context.Shelters
+                .Include(s => s.ShelterResources)
+                .Include(s => s.Evacuees)
                 .OrderBy(s => s.ShelterName)
                 .ToListAsync();
         }
@@ -44,6 +48,8 @@ namespace FYP_Project_II.Controllers
             if (string.IsNullOrEmpty(userName)) return Unauthorized();
 
             var shelter = await _context.Shelters
+                .Include(s => s.ShelterResources)
+                .Include(s => s.Evacuees)
                 .FirstOrDefaultAsync(s => s.ManagedBy == userName);
             if (shelter == null) return NotFound();
             return shelter;
@@ -299,6 +305,8 @@ namespace FYP_Project_II.Controllers
 
             return NoContent();
         }
+
+
 
         [HttpPost("{shelterId}/evacuees/{evacueeId}/checkout")]
         [Authorize]

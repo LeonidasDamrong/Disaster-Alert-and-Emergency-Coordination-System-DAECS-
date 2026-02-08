@@ -20,7 +20,10 @@ namespace FYP_Project_II.Data
         {
             await SystemSeeder.SeedSystemDataAsync(dbContext);
             await ShelterSeeder.SeedSheltersAsync(dbContext);
+            await WarehouseSeeder.SeedWarehousesAsync(dbContext);
+            await DriverSeeder.SeedDriversAsync(dbContext);
             await ResourceSeeder.SeedResourcesAsync(dbContext);
+            await ResourceRequestSeeder.SeedResourceRequestsAsync(dbContext);
             await CommunicationSeeder.SeedCommunicationDataAsync(dbContext);
             
             await dbContext.SaveChangesAsync();

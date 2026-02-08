@@ -13,11 +13,11 @@ import {
 } from '../ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Home as HomeIcon, Users, MapPin, Plus, Printer, Loader2, Pencil, Trash2, FileCheck, Check, X } from 'lucide-react';
-import { Shelter, ShelterStatus } from '../../lib/types';
-import type { ShelterRegistrationRequestApi } from '../../lib/types';
+import { Shelter, ShelterStatus, ShelterRegistrationRequestApi, ShelterReportApi } from '../../lib/types';
 import { shelterApi } from '../../lib/api';
 import { authApi } from '../../lib/api';
 import { toast } from 'sonner';
+import { ShelterReportModal } from './ShelterReportModal';
 
 interface UserOption {
   userId: string;
@@ -41,6 +41,8 @@ export const AdminShelterView = () => {
   const [rejectDialog, setRejectDialog] = useState<{ requestId: string; request: ShelterRegistrationRequestApi } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [generatedReport, setGeneratedReport] = useState<ShelterReportApi | null>(null);
 
   const shelterManagers = users.filter(u => u.role === 'Shelter Manager');
 
@@ -187,7 +189,9 @@ export const AdminShelterView = () => {
 
   const handleGenerateReport = async (shelterId: string, shelterName: string) => {
     try {
-      await shelterApi.generateReport(shelterId);
+      const report = await shelterApi.generateReport(shelterId);
+      setGeneratedReport(report);
+      setShowReportModal(true);
       toast.success(`Report generated for ${shelterName}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to generate report');
@@ -516,6 +520,12 @@ export const AdminShelterView = () => {
       {shelters.length === 0 && (
         <Card><CardContent className="py-12 text-center text-gray-500">No shelters. Add one using the button above.</CardContent></Card>
       )}
+
+      <ShelterReportModal
+        open={showReportModal}
+        onOpenChange={setShowReportModal}
+        report={generatedReport}
+      />
     </div>
   );
 };

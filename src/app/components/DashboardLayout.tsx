@@ -51,7 +51,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { path: '/sos', icon: Radio, label: 'SOS Monitoring', roles: ['System Admin', 'Admin', 'First Responder'] },
     { path: '/alerts', icon: AlertTriangle, label: 'Alert Broadcasting', roles: ['System Admin', 'Admin', 'First Responder'] },
     { path: '/shelters', icon: HomeIcon, label: 'Shelter Management', roles: ['System Admin', 'Admin', 'Shelter Manager'] },
-    { path: '/resources', icon: Package, label: 'Resource Management', roles: ['System Admin', 'Admin', 'Resource Manager'] },
+    { path: '/resources', icon: Package, label: 'Resource Management', roles: ['System Admin', 'Admin', 'Resource Manager', 'Shelter Manager', 'First Responder', 'Disaster Manager'] },
     { path: '/admin', icon: Users, label: 'Admin Management', roles: ['System Admin', 'Admin'] },
   ];
 

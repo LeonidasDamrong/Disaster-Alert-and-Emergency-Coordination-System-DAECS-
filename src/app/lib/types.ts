@@ -95,6 +95,8 @@ export interface ShelterApi {
   managedBy?: string | null;
   registeredAt: string;
   lastModifiedAt: string;
+  shelterResources?: { resourceType: string; quantity: number }[];
+  evacuees?: EvacueeApi[];
 }
 
 export interface EvacueeApi {
@@ -147,31 +149,71 @@ export interface ShelterRegistrationRequestApi {
 
 // Resource Types
 export type ResourceStatus = 'Pending' | 'Approved' | 'Rejected' | 'Delivered';
-export type ResourceCategory = 'Food' | 'Medical' | 'Shelter Supplies' | 'Equipment' | 'Transport';
+export type ResourceCategory = 'Food' | 'Medical' | 'Shelter Supplies' | 'Equipment' | 'Transport' | 'Water' | 'Supplies' | 'Shelter';
 
 export interface Resource {
-  id: string;
-  category: ResourceCategory;
-  itemName: string;
-  quantity: number;
+  resourceItemId: string;
+  warehouseId: string;
+  warehouseName: string;
+  name: string;
+  type: string;
   unit: string;
-  location: string;
+  quantity: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ResourceRequest {
-  id: string;
+  resourceRequestId: string;
+  resourceItemId: string;
+  warehouseId: string;
+  warehouseName: string;
   requestedBy: string;
-  category: ResourceCategory;
   itemName: string;
+  type: string;
   quantity: number;
   unit: string;
   destination: string;
   urgency: UrgencyLevel;
   status: ResourceStatus;
-  rejectionNote?: string;
-  assignedTeam?: string;
+  rejectionReason?: string;
+  assignedDriverId?: string;
+  driverName?: string;
+  processedBy?: string;
   requestedAt: string;
   processedAt?: string;
+  updatedAt: string;
+}
+
+export interface Warehouse {
+  warehouseId: string;
+  name: string;
+  address: string;
+  managedBy?: string | null;
+}
+
+export interface Driver {
+  driverId: string;
+  name: string;
+  phone: string;
+  vehicleInfo: string;
+  status: string;
+}
+
+export interface ResourceUsageReport {
+  reportId: string;
+  warehouseId: string;
+  warehouseName: string;
+  resourceItemId: string;
+  itemName: string;
+  type: string;
+  quantity: number;
+  unit: string;
+  status: string;
+  requestsCount: number;
+  deliveredCount: number;
+  generatedAt: string;
 }
 
 // Audit Log Types

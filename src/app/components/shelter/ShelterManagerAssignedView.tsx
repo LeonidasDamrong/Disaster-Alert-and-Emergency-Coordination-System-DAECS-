@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -6,9 +6,10 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Home as HomeIcon, Users, MapPin, Plus, Printer, Loader2, LogOut, Package, FileCheck } from 'lucide-react';
-import { Shelter, ShelterStatus } from '../../lib/types';
+import { Shelter, ShelterStatus, ShelterReportApi } from '../../lib/types';
 import { shelterApi } from '../../lib/api';
 import { toast } from 'sonner';
+import { ShelterReportModal } from './ShelterReportModal';
 
 interface ShelterManagerAssignedViewProps {
   shelter: Shelter;
@@ -26,6 +27,8 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
     medicalNeeds: '',
     idNumber: ''
   });
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [generatedReport, setGeneratedReport] = useState<ShelterReportApi | null>(null);
 
   const loadDetails = useCallback(async () => {
     setLoading(true);
@@ -80,7 +83,9 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
 
   const handleGenerateReport = async () => {
     try {
-      await shelterApi.generateReport(shelter.id);
+      const report = await shelterApi.generateReport(shelter.id);
+      setGeneratedReport(report);
+      setShowReportModal(true);
       toast.success(`Report generated for ${shelter.name}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to generate report');
@@ -156,9 +161,8 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
               <p className="font-semibold">{shelter.currentOccupancy} / {shelter.TotalCapacity}</p>
               <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
                 <div
-                  className={`h-2 rounded-full ${
-                    occupancyPct >= 90 ? 'bg-red-600' : occupancyPct >= 70 ? 'bg-orange-600' : 'bg-green-600'
-                  }`}
+                  className={`h-2 rounded-full ${occupancyPct >= 90 ? 'bg-red-600' : occupancyPct >= 70 ? 'bg-orange-600' : 'bg-green-600'
+                    }`}
                   style={{ width: `${occupancyPct}%` }}
                 />
               </div>
@@ -290,6 +294,11 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
           Generate status report
         </Button>
       </div>
+      <ShelterReportModal
+        open={showReportModal}
+        onOpenChange={setShowReportModal}
+        report={generatedReport}
+      />
     </div>
   );
 };

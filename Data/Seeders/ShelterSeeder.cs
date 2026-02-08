@@ -44,11 +44,14 @@ namespace FYP_Project_II.Data.Seeders
                 var shelterResources = new[]
                 {
                     new ShelterResource { ShelterResourceId = "SR001", ShelterId = "SHEL001", ResourceType = "Food", Quantity = 500, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR002", ShelterId = "SHEL001", ResourceType = "Medical", Quantity = 50, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR002", ShelterId = "SHEL001", ResourceType = "Medical Supplies", Quantity = 50, CreatedAt = baseDate, UpdatedAt = baseDate },
                     new ShelterResource { ShelterResourceId = "SR003", ShelterId = "SHEL001", ResourceType = "Blankets", Quantity = 200, CreatedAt = baseDate, UpdatedAt = baseDate },
                     new ShelterResource { ShelterResourceId = "SR004", ShelterId = "SHEL001", ResourceType = "Water", Quantity = 1000, CreatedAt = baseDate, UpdatedAt = baseDate },
                     new ShelterResource { ShelterResourceId = "SR005", ShelterId = "SHEL002", ResourceType = "Food", Quantity = 300, CreatedAt = baseDate, UpdatedAt = baseDate },
                     new ShelterResource { ShelterResourceId = "SR006", ShelterId = "SHEL002", ResourceType = "Water", Quantity = 500, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR007", ShelterId = "SHEL002", ResourceType = "Hygiene Kits", Quantity = 100, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR008", ShelterId = "SHEL003", ResourceType = "Food", Quantity = 150, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR009", ShelterId = "SHEL003", ResourceType = "Water", Quantity = 200, CreatedAt = baseDate, UpdatedAt = baseDate }
                 };
                 await dbContext.ShelterResources.AddRangeAsync(shelterResources);
                 Console.WriteLine("Seeded Shelter Resources");

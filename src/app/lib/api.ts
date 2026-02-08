@@ -165,8 +165,8 @@ function mapShelterApiToShelter(s: ShelterApi, evacuees: Evacuee[] = [], resourc
         status: (s.status as Shelter['status']) || 'Open',
         manager: s.managedBy ?? '',
         phone: '',
-        resources,
-        evacuees,
+        resources: s.shelterResources ? s.shelterResources.map(r => `${r.resourceType}: ${r.quantity}`) : resources,
+        evacuees: s.evacuees ? s.evacuees.map(mapEvacueeApiToEvacuee) : evacuees,
         createdAt: s.registeredAt
     };
 }
@@ -183,6 +183,131 @@ function mapEvacueeApiToEvacuee(e: EvacueeApi): Evacuee {
         idNumber: e.evacueeIdNumber ?? undefined
     };
 }
+
+// Resource Management API
+export const resourceApi = {
+    getWarehouses: () => apiClient.get<Array<{ warehouseId: string; name: string; address: string; managedBy?: string | null }>>('/api/resources/warehouses'),
+
+    getMyWarehouse: () => apiClient.get<{ warehouseId: string; name: string; address: string; managedBy?: string | null }>('/api/resources/warehouses/my-warehouse'),
+
+    updateWarehouse: (warehouseId: string, data: { name?: string; address?: string; managedBy?: string | null }) =>
+        apiClient.put(`/api/resources/warehouses/${encodeURIComponent(warehouseId)}`, data),
+
+    getResources: (warehouseId?: string, status?: string) => {
+        const params = new URLSearchParams();
+        if (warehouseId) params.set('warehouseId', warehouseId);
+        if (status) params.set('status', status);
+        return apiClient.get<Array<{
+            resourceItemId: string;
+            warehouseId: string;
+            warehouseName: string;
+            name: string;
+            type: string;
+            unit: string;
+            quantity: number;
+            status: string;
+            createdAt: string;
+            updatedAt: string;
+        }>>(`/api/resources?${params.toString()}`);
+    },
+
+    getOverallQuantity: () => apiClient.get<{
+        byItem: Array<{ name: string; type: string; unit: string; totalQuantity: number; byWarehouse: Array<{ warehouseId: string; warehouseName: string; totalQuantity: number }> }>;
+        byWarehouse: unknown;
+    }>('/api/resources/overall-quantity'),
+
+    getResource: (resourceItemId: string) =>
+        apiClient.get<{
+            resourceItemId: string;
+            warehouseId: string;
+            warehouseName: string;
+            name: string;
+            type: string;
+            unit: string;
+            quantity: number;
+            status: string;
+            createdAt: string;
+            updatedAt: string;
+        }>(`/api/resources/${encodeURIComponent(resourceItemId)}`),
+
+    createResource: (data: { warehouseId: string; name: string; type: string; unit?: string; quantity: number; status?: string }) =>
+        apiClient.post('/api/resources', data),
+
+    updateResource: (resourceItemId: string, data: { name?: string; type?: string; unit?: string; quantity?: number; status?: string; warehouseId?: string }) =>
+        apiClient.put(`/api/resources/${encodeURIComponent(resourceItemId)}`, data),
+
+    deleteResource: (resourceItemId: string) =>
+        apiClient.delete(`/api/resources/${encodeURIComponent(resourceItemId)}`),
+
+    stockIn: (resourceItemId: string, data: { quantityAdded: number; source: string }) =>
+        apiClient.post(`/api/resources/${encodeURIComponent(resourceItemId)}/stock-in`, data),
+
+    getStockLogs: (resourceItemId: string) =>
+        apiClient.get<Array<{ resourceStockLogId: string; quantityAdded: number; source: string; loggedBy: string; loggedAt: string }>>(
+            `/api/resources/${encodeURIComponent(resourceItemId)}/stock-logs`
+        ),
+
+    getResourceRequests: (status?: string, myOnly?: boolean) => {
+        const params = new URLSearchParams();
+        if (status) params.set('status', status);
+        if (myOnly !== undefined) params.set('myOnly', String(myOnly));
+        return apiClient.get<Array<{
+            resourceRequestId: string;
+            resourceItemId: string;
+            warehouseId: string;
+            warehouseName: string;
+            requestedBy: string;
+            itemName: string;
+            type: string;
+            quantity: number;
+            unit: string;
+            destination: string;
+            urgency: string;
+            status: string;
+            rejectionReason?: string;
+            assignedDriverId?: string;
+            driverName?: string;
+            processedBy?: string;
+            requestedAt: string;
+            processedAt?: string;
+            updatedAt: string;
+        }>>(`/api/resources/requests?${params.toString()}`);
+    },
+
+    createResourceRequest: (data: { resourceItemId: string; quantity: number; destination?: string; urgency?: string }) =>
+        apiClient.post('/api/resources/requests', data),
+
+    approveResourceRequest: (requestId: string) =>
+        apiClient.post(`/api/resources/requests/${encodeURIComponent(requestId)}/approve`),
+
+    rejectResourceRequest: (requestId: string, rejectionReason: string) =>
+        apiClient.post(`/api/resources/requests/${encodeURIComponent(requestId)}/reject`, { rejectionReason }),
+
+    assignDriver: (requestId: string, driverId: string) =>
+        apiClient.post(`/api/resources/requests/${encodeURIComponent(requestId)}/assign-driver`, { driverId }),
+
+    markDelivered: (requestId: string) =>
+        apiClient.post(`/api/resources/requests/${encodeURIComponent(requestId)}/mark-delivered`),
+
+    getDrivers: () =>
+        apiClient.get<Array<{ driverId: string; name: string; phone: string; vehicleInfo: string; status: string }>>('/api/resources/drivers'),
+
+    getUsageReport: () =>
+        apiClient.get<Array<{
+            reportId: string;
+            warehouseId: string;
+            warehouseName: string;
+            resourceItemId: string;
+            itemName: string;
+            type: string;
+            quantity: number;
+            unit: string;
+            status: string;
+            requestsCount: number;
+            deliveredCount: number;
+            generatedAt: string;
+        }>>('/api/resources/usage-report'),
+};
 
 export const shelterApi = {
     getAll: async (): Promise<Shelter[]> => {

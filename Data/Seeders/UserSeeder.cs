@@ -111,6 +111,15 @@ namespace FYP_Project_II.Data.Seeders
                     PhoneNumber = "+60123456792",
                     EmailConfirmed = true,
                     CreatedAt = baseDate
+                }, Role = "Resource Manager", Password = "Resource@123" },
+                new { User = new ApplicationUser
+                {
+                    UserName = "resource002",
+                    Email = "ali@resource.daecs.gov.my",
+                    Name = "Ali bin Rahman",
+                    PhoneNumber = "+60123456795",
+                    EmailConfirmed = true,
+                    CreatedAt = baseDate
                 }, Role = "Resource Manager", Password = "Resource@123" }
             };
 

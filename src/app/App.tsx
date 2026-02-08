@@ -89,7 +89,7 @@ const AppRouter = () => {
       <Route
         path="/resources"
         element={
-          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'Resource Manager']}>
+          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'Resource Manager', 'Shelter Manager', 'First Responder', 'Disaster Manager']}>
             <DashboardLayout>
               <ResourceManagement />
             </DashboardLayout>

@@ -105,6 +105,23 @@ namespace FYP_Project_II.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Drivers",
+                columns: table => new
+                {
+                    DriverId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    VehicleInfo = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Drivers", x => x.DriverId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Evacuees",
                 columns: table => new
                 {
@@ -130,11 +147,20 @@ namespace FYP_Project_II.Data.Migrations
                 {
                     ResourceRequestId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     ResourceItemId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    WarehouseId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RequestedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ItemName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Quantity = table.Column<int>(type: "int", nullable: false),
+                    Unit = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Destination = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Urgency = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    RejectionReason = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AssignedDriverId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ProcessedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ProcessedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -147,8 +173,10 @@ namespace FYP_Project_II.Data.Migrations
                 columns: table => new
                 {
                     ResourceItemId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    WarehouseId = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Unit = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Quantity = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -157,6 +185,23 @@ namespace FYP_Project_II.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Resources", x => x.ResourceItemId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ResourceStockLogs",
+                columns: table => new
+                {
+                    ResourceStockLogId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ResourceItemId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    WarehouseId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    QuantityAdded = table.Column<int>(type: "int", nullable: false),
+                    Source = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LoggedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LoggedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ResourceStockLogs", x => x.ResourceStockLogId);
                 });
 
             migrationBuilder.CreateTable(
@@ -265,6 +310,22 @@ namespace FYP_Project_II.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_SystemSettings", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Warehouses",
+                columns: table => new
+                {
+                    WarehouseId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ManagedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Warehouses", x => x.WarehouseId);
                 });
 
             migrationBuilder.CreateTable(
@@ -441,6 +502,9 @@ namespace FYP_Project_II.Data.Migrations
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "Drivers");
+
+            migrationBuilder.DropTable(
                 name: "Evacuees");
 
             migrationBuilder.DropTable(
@@ -448,6 +512,9 @@ namespace FYP_Project_II.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "Resources");
+
+            migrationBuilder.DropTable(
+                name: "ResourceStockLogs");
 
             migrationBuilder.DropTable(
                 name: "ShelterRegistrationRequests");
@@ -466,6 +533,9 @@ namespace FYP_Project_II.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "SystemSettings");
+
+            migrationBuilder.DropTable(
+                name: "Warehouses");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

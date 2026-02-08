@@ -13,8 +13,11 @@ namespace FYP_Project_II.Data
         public DbSet<ShelterResource> ShelterResources { get; set; }
         public DbSet<ShelterReport> ShelterReports { get; set; }
         public DbSet<ShelterRegistrationRequest> ShelterRegistrationRequests { get; set; }
+        public DbSet<Warehouse> Warehouses { get; set; }
+        public DbSet<Driver> Drivers { get; set; }
         public DbSet<ResourceItem> Resources { get; set; }
         public DbSet<ResourceRequest> ResourceRequests { get; set; }
+        public DbSet<ResourceStockLog> ResourceStockLogs { get; set; }
         public DbSet<SOSRequest> SOSRequests { get; set; }
         public DbSet<Alert> Alerts { get; set; }
         public DbSet<SystemSettings> SystemSettings { get; set; }
