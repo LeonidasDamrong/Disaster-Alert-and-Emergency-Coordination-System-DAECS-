@@ -8,6 +8,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (role: UserRole) => boolean;
+  hasAnyRole: (roles: UserRole[]) => boolean;
   isLoading: boolean;
 }
 
@@ -93,6 +94,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return user?.role === role;
   };
 
+  const hasAnyRole = (roles: UserRole[]): boolean => {
+    return user?.role != null && roles.includes(user.role);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -101,6 +106,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         logout,
         isAuthenticated: !!user,
         hasRole,
+        hasAnyRole,
         isLoading,
       }}
     >

@@ -30,6 +30,20 @@ namespace FYP_Project_II.Controllers
                 .ToListAsync();
         }
 
+        /// <summary>Get the shelter assigned to the current user (Shelter Manager). Returns 404 if none.</summary>
+        [HttpGet("my-shelter")]
+        [Authorize]
+        public async Task<ActionResult<Shelter>> GetMyShelter()
+        {
+            var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
+            if (string.IsNullOrEmpty(userName)) return Unauthorized();
+
+            var shelter = await _context.Shelters
+                .FirstOrDefaultAsync(s => s.ManagedBy == userName);
+            if (shelter == null) return NotFound();
+            return shelter;
+        }
+
         [HttpGet("{shelterId}")]
         public async Task<ActionResult<Shelter>> GetShelter(string shelterId)
         {

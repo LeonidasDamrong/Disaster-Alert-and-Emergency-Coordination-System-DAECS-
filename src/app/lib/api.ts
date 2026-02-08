@@ -190,6 +190,16 @@ export const shelterApi = {
         return list.map(s => mapShelterApiToShelter(s));
     },
 
+    /** Returns the shelter assigned to the current user (Shelter Manager), or null if none. */
+    getMyShelter: async (): Promise<Shelter | null> => {
+        try {
+            const raw = await apiClient.get<ShelterApi>('/api/shelters/my-shelter');
+            return mapShelterApiToShelter(raw);
+        } catch {
+            return null;
+        }
+    },
+
     getById: (shelterId: string) =>
         apiClient.get<ShelterApi>(`/api/shelters/${encodeURIComponent(shelterId)}`),
 
