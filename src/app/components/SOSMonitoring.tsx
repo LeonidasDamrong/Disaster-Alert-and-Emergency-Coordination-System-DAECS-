@@ -1,81 +1,203 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Radio, MapPin, Phone, User, Clock, FileText, Plus, CheckCircle } from 'lucide-react';
-import { mockSOSRequests } from '../lib/mockData';
+import { MapPin, Phone, User, Clock, FileText, Plus, CheckCircle, Locate } from 'lucide-react';
+import { sosApi } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { useSOSSignalR, type SOSUpdatePayload } from '../hooks/useSOSSignalR';
+import { SOSMapView, type DangerZoneData } from './SOSMapView';
 import { SOSStatus, UrgencyLevel, SOS, CaseNote } from '../lib/types';
 import { toast } from 'sonner';
 
+function mapApiToSOS(r: {
+  id: string;
+  victimName: string;
+  victimPhone: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  description: string;
+  urgency: string;
+  status: string;
+  assignedResponder?: string;
+  createdAt: string;
+  updatedAt: string;
+  solvedAt?: string;
+}): SOS {
+  return {
+    id: r.id,
+    victimName: r.victimName ?? '',
+    victimPhone: r.victimPhone ?? '',
+    location: r.location ?? '',
+    latitude: Number(r.latitude) || 0,
+    longitude: Number(r.longitude) || 0,
+    description: r.description ?? '',
+    urgency: (r.urgency as UrgencyLevel) || 'Medium',
+    status: (r.status as SOSStatus) || 'New',
+    assignedResponder: r.assignedResponder,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    notes: [],
+  };
+}
+
 export const SOSMonitoring = () => {
-  const [sosRequests, setSOSRequests] = useState<SOS[]>(mockSOSRequests);
+  const { user } = useAuth();
+  const isViewOnly = user?.role === 'Admin' || user?.role === 'System Admin';
+
+  const [sosRequests, setSOSRequests] = useState<SOS[]>([]);
   const [selectedSOS, setSelectedSOS] = useState<SOS | null>(null);
+  const [selectedNotes, setSelectedNotes] = useState<CaseNote[]>([]);
   const [newNote, setNewNote] = useState('');
   const [filterStatus, setFilterStatus] = useState<SOSStatus | 'All'>('All');
+  const [dangerZones, setDangerZones] = useState<DangerZoneData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [locateSOSId, setLocateSOSId] = useState<string | null>(null);
+  const mapSectionRef = React.useRef<HTMLDivElement>(null);
+
+  const fetchSOS = useCallback(async () => {
+    try {
+      const status = filterStatus === 'All' ? undefined : filterStatus;
+      const list = await sosApi.getAll(status);
+      setSOSRequests(list.map(mapApiToSOS));
+    } catch (err) {
+      console.error('Failed to fetch SOS:', err);
+      toast.error('Failed to load SOS requests');
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus]);
+
+  const fetchDangerZones = useCallback(async () => {
+    try {
+      const zones = await sosApi.getDangerZones();
+      setDangerZones(zones);
+    } catch {
+      setDangerZones([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSOS();
+  }, [fetchSOS]);
+
+  useEffect(() => {
+    fetchDangerZones();
+  }, [fetchDangerZones]);
+
+  useSOSSignalR(
+    (payload: SOSUpdatePayload) => {
+      setSOSRequests(prev => {
+        const existing = prev.find(s => s.id === payload.id);
+        if (existing) return prev;
+        return [mapApiToSOS(payload), ...prev];
+      });
+      toast.success(`New SOS: ${payload.id}`);
+    },
+    (payload: SOSUpdatePayload) => {
+      setSOSRequests(prev =>
+        prev.map(s => s.id === payload.id ? mapApiToSOS(payload) : s)
+      );
+      if (selectedSOS?.id === payload.id) {
+        setSelectedSOS(mapApiToSOS(payload));
+      }
+    },
+    !!user
+  );
+
+  const handleOpenDetails = useCallback(async (sos: SOS) => {
+    setSelectedSOS(sos);
+    setDialogOpen(true);
+    try {
+      const notes = await sosApi.getNotes(sos.id);
+      setSelectedNotes(notes);
+    } catch {
+      setSelectedNotes([]);
+    }
+  }, []);
+
+  const handleLocate = useCallback((sos: SOS) => {
+    setSelectedSOS(sos);
+    setLocateSOSId(sos.id);
+    setDialogOpen(false);
+    mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const filteredSOS = filterStatus === 'All'
     ? sosRequests
     : sosRequests.filter(sos => sos.status === filterStatus);
 
-  const handleAcceptSOS = (sosId: string) => {
-    setSOSRequests(prev =>
-      prev.map(sos =>
-        sos.id === sosId
-          ? { ...sos, status: 'In Progress' as SOSStatus, assignedResponder: 'Siti Nurhaliza', updatedAt: new Date().toISOString() }
-          : sos
-      )
-    );
-    toast.success('SOS request accepted and assigned');
+  const handleAcceptSOS = async (sosId: string) => {
+    try {
+      const updated = await sosApi.update(sosId, { accept: true });
+      setSOSRequests(prev =>
+        prev.map(s => (s.id === sosId ? mapApiToSOS(updated) : s))
+      );
+      if (selectedSOS?.id === sosId) {
+        setSelectedSOS(mapApiToSOS(updated));
+      }
+      toast.success('SOS request accepted and assigned');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to accept');
+    }
   };
 
-  const handleUpdateUrgency = (sosId: string, urgency: UrgencyLevel) => {
-    setSOSRequests(prev =>
-      prev.map(sos =>
-        sos.id === sosId
-          ? { ...sos, urgency, updatedAt: new Date().toISOString() }
-          : sos
-      )
-    );
-    toast.success(`Urgency level updated to ${urgency}`);
+  const handleUpdateUrgency = async (sosId: string, urgency: UrgencyLevel) => {
+    try {
+      const updated = await sosApi.update(sosId, { urgency });
+      setSOSRequests(prev =>
+        prev.map(s => (s.id === sosId ? mapApiToSOS(updated) : s))
+      );
+      if (selectedSOS?.id === sosId) {
+        setSelectedSOS(mapApiToSOS(updated));
+      }
+      toast.success(`Urgency level updated to ${urgency}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update');
+    }
   };
 
-  const handleUpdateStatus = (sosId: string, status: SOSStatus) => {
-    setSOSRequests(prev =>
-      prev.map(sos =>
-        sos.id === sosId
-          ? { ...sos, status, updatedAt: new Date().toISOString() }
-          : sos
-      )
-    );
-    toast.success(`Status updated to ${status}`);
+  const handleUpdateStatus = async (sosId: string, status: SOSStatus) => {
+    try {
+      const updated = await sosApi.update(sosId, { status });
+      setSOSRequests(prev =>
+        prev.map(s => (s.id === sosId ? mapApiToSOS(updated) : s))
+      );
+      if (selectedSOS?.id === sosId) {
+        setSelectedSOS(mapApiToSOS(updated));
+      }
+      toast.success(`Status updated to ${status}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update');
+    }
   };
 
-  const handleAddNote = (sosId: string) => {
+  const handleAddNote = async (sosId: string) => {
     if (!newNote.trim()) return;
 
-    const note: CaseNote = {
-      id: `NOTE${Date.now()}`,
-      author: 'Siti Nurhaliza',
-      timestamp: new Date().toISOString(),
-      note: newNote
-    };
-
-    setSOSRequests(prev =>
-      prev.map(sos =>
-        sos.id === sosId
-          ? { ...sos, notes: [...sos.notes, note], updatedAt: new Date().toISOString() }
-          : sos
-      )
-    );
-
-    setNewNote('');
-    toast.success('Case note added successfully');
+    try {
+      const note = await sosApi.addNote(sosId, newNote);
+      setSelectedNotes(prev => [...prev, note]);
+      setSOSRequests(prev =>
+        prev.map(s =>
+          s.id === sosId
+            ? { ...s, notes: [...s.notes, note], updatedAt: note.timestamp }
+            : s
+        )
+      );
+      setNewNote('');
+      toast.success('Case note added successfully');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add note');
+    }
   };
 
   const getUrgencyColor = (urgency: UrgencyLevel) => {
@@ -95,6 +217,8 @@ export const SOSMonitoring = () => {
     }
   };
 
+  const displayNotes = selectedSOS ? [...selectedSOS.notes, ...selectedNotes] : [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -102,6 +226,27 @@ export const SOSMonitoring = () => {
           <h2 className="text-3xl font-bold">SOS Monitoring</h2>
           <p className="text-gray-600">Emergency request management and tracking</p>
         </div>
+      </div>
+
+      {/* Large Map View */}
+      <div ref={mapSectionRef}>
+        <Card>
+        <CardHeader>
+          <CardTitle>Live Map</CardTitle>
+          <CardDescription>SOS request locations and danger zones</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="h-[600px] w-full">
+            <SOSMapView
+              sosRequests={filteredSOS}
+              dangerZones={dangerZones}
+              selectedSOSId={selectedSOS?.id}
+              centerOnSOSId={locateSOSId}
+              onMarkerClick={(s) => setSelectedSOS(s)}
+            />
+          </div>
+        </CardContent>
+      </Card>
       </div>
 
       {/* Filters */}
@@ -132,213 +277,259 @@ export const SOSMonitoring = () => {
           <CardDescription>Active and pending emergency requests</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Victim Info</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Urgency</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSOS.map((sos) => (
-                <TableRow key={sos.id}>
-                  <TableCell className="font-mono">{sos.id}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-semibold">{sos.victimName}</p>
-                      <p className="text-sm text-gray-600">{sos.victimPhone}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                      <span className="text-sm">{sos.location}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${getUrgencyColor(sos.urgency)} border`}>
-                      {sos.urgency}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusColor(sos.status)}>
-                      {sos.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {sos.assignedResponder || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
+          {loading ? (
+            <p className="text-gray-500 py-8 text-center">Loading...</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Victim Info</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Urgency</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSOS.map((sos) => (
+                  <TableRow key={sos.id}>
+                    <TableCell className="font-mono">{sos.id}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-semibold">{sos.victimName}</p>
+                        <p className="text-sm text-gray-600">{sos.victimPhone}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                        <span className="text-sm">{sos.location}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${getUrgencyColor(sos.urgency)} border`}>
+                        {sos.urgency}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusColor(sos.status)}>
+                        {sos.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {sos.assignedResponder || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenDetails(sos)}
+                      >
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SOS Details Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {selectedSOS && (
+            <>
+              <DialogHeader>
+                <DialogTitle>SOS Request Details - {selectedSOS.id}</DialogTitle>
+                <DialogDescription>
+                  Created: {new Date(selectedSOS.createdAt).toLocaleString('en-MY')}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Victim Name
+                    </Label>
+                    <p className="font-semibold">{selectedSOS.victimName}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      Contact Number
+                    </Label>
+                    <p className="font-semibold">{selectedSOS.victimPhone}</p>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Location
+                    </Label>
+                    <div className="flex items-center gap-3">
+                      <p className="font-semibold">{selectedSOS.location}</p>
+                      {selectedSOS.latitude && selectedSOS.longitude && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setSelectedSOS(sos)}
+                          className="gap-2"
+                          onClick={() => handleLocate(selectedSOS)}
                         >
-                          View Details
+                          <Locate className="h-4 w-4" />
+                          Locate on Map
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>SOS Request Details - {sos.id}</DialogTitle>
-                          <DialogDescription>
-                            Created: {new Date(sos.createdAt).toLocaleString('en-MY')}
-                          </DialogDescription>
-                        </DialogHeader>
+                      )}
+                    </div>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>Description of Situation</Label>
+                    <p className="p-3 bg-gray-50 rounded border">{selectedSOS.description || 'No description'}</p>
+                  </div>
+                </div>
 
-                        <div className="space-y-6">
-                          {/* Victim Information */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                Victim Name
-                              </Label>
-                              <p className="font-semibold">{sos.victimName}</p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="flex items-center gap-2">
-                                <Phone className="h-4 w-4" />
-                                Contact Number
-                              </Label>
-                              <p className="font-semibold">{sos.victimPhone}</p>
-                            </div>
-                            <div className="col-span-2 space-y-2">
-                              <Label className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4" />
-                                Location
-                              </Label>
-                              <p className="font-semibold">{sos.location}</p>
-                              <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
-                                Map Placeholder: {sos.latitude}, {sos.longitude}
+                {!isViewOnly && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Update Urgency Level</Label>
+                        <Select
+                          value={selectedSOS.urgency}
+                          onValueChange={(value) => handleUpdateUrgency(selectedSOS.id, value as UrgencyLevel)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                            <SelectItem value="Critical">Critical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Update Status</Label>
+                        <Select
+                          value={selectedSOS.status}
+                          onValueChange={(value) => handleUpdateStatus(selectedSOS.id, value as SOSStatus)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="New">New</SelectItem>
+                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {selectedSOS.status === 'New' && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button className="w-full bg-red-600 hover:bg-red-700">
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Accept SOS Request
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Accept SOS Request?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will assign the request to you and change the status to "In Progress".
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleAcceptSOS(selectedSOS.id)}>
+                              Accept Request
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+
+                    <div className="space-y-3">
+                      <Label className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Case Notes
+                      </Label>
+                      <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3">
+                        {displayNotes.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No notes yet</p>
+                        ) : (
+                          displayNotes.map((note) => (
+                            <div key={note.id} className="p-3 bg-gray-50 rounded border">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-semibold">{note.author}</span>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {new Date(note.timestamp).toLocaleString('en-MY')}
+                                </span>
                               </div>
+                              <p className="text-sm">{note.note}</p>
                             </div>
-                            <div className="col-span-2 space-y-2">
-                              <Label>Description of Situation</Label>
-                              <p className="p-3 bg-gray-50 rounded border">{sos.description}</p>
-                            </div>
-                          </div>
+                          ))
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Textarea
+                          placeholder="Add a case note..."
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          rows={3}
+                        />
+                        <Button
+                          onClick={() => handleAddNote(selectedSOS.id)}
+                          size="sm"
+                          className="gap-2"
+                          disabled={!newNote.trim()}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add Note
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
-                          {/* Actions */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Update Urgency Level</Label>
-                              <Select
-                                value={sos.urgency}
-                                onValueChange={(value) => handleUpdateUrgency(sos.id, value as UrgencyLevel)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Low">Low</SelectItem>
-                                  <SelectItem value="Medium">Medium</SelectItem>
-                                  <SelectItem value="High">High</SelectItem>
-                                  <SelectItem value="Critical">Critical</SelectItem>
-                                </SelectContent>
-                              </Select>
+                {isViewOnly && (
+                  <div className="space-y-3">
+                    <Label className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Case Notes
+                    </Label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3">
+                      {displayNotes.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-4">No notes yet</p>
+                      ) : (
+                        displayNotes.map((note) => (
+                          <div key={note.id} className="p-3 bg-gray-50 rounded border">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-semibold">{note.author}</span>
+                              <span className="text-xs text-gray-500 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(note.timestamp).toLocaleString('en-MY')}
+                              </span>
                             </div>
-                            <div className="space-y-2">
-                              <Label>Update Status</Label>
-                              <Select
-                                value={sos.status}
-                                onValueChange={(value) => handleUpdateStatus(sos.id, value as SOSStatus)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="New">New</SelectItem>
-                                  <SelectItem value="In Progress">In Progress</SelectItem>
-                                  <SelectItem value="Completed">Completed</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                            <p className="text-sm">{note.note}</p>
                           </div>
-
-                          {sos.status === 'New' && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button className="w-full bg-red-600 hover:bg-red-700">
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                  Accept SOS Request
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Accept SOS Request?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will assign the request to you and change the status to "In Progress".
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleAcceptSOS(sos.id)}>
-                                    Accept Request
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-
-                          {/* Case Notes */}
-                          <div className="space-y-3">
-                            <Label className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              Case Notes
-                            </Label>
-                            <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3">
-                              {sos.notes.length === 0 ? (
-                                <p className="text-sm text-gray-500 text-center py-4">No notes yet</p>
-                              ) : (
-                                sos.notes.map((note) => (
-                                  <div key={note.id} className="p-3 bg-gray-50 rounded border">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="text-sm font-semibold">{note.author}</span>
-                                      <span className="text-xs text-gray-500 flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {new Date(note.timestamp).toLocaleString('en-MY')}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm">{note.note}</p>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                            <div className="space-y-2">
-                              <Textarea
-                                placeholder="Add a case note..."
-                                value={newNote}
-                                onChange={(e) => setNewNote(e.target.value)}
-                                rows={3}
-                              />
-                              <Button
-                                onClick={() => handleAddNote(sos.id)}
-                                size="sm"
-                                className="gap-2"
-                                disabled={!newNote.trim()}
-                              >
-                                <Plus className="h-4 w-4" />
-                                Add Note
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

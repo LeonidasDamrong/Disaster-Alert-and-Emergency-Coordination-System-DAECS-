@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FYP_Project_II.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260209053633_InitialCreate")]
+    [Migration("20260209154837_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -207,6 +207,75 @@ namespace FYP_Project_II.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("AuditLogs");
+                });
+
+            modelBuilder.Entity("FYP_Project_II.Models.CaseNote", b =>
+                {
+                    b.Property<string>("CaseNoteId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResponderId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SOSRequestId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("CaseNoteId");
+
+                    b.ToTable("CaseNotes");
+                });
+
+            modelBuilder.Entity("FYP_Project_II.Models.DangerZone", b =>
+                {
+                    b.Property<string>("DangerZoneId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal>("CenterLatitude")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("CenterLongitude")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ColorHex")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DangerLevel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("RadiusMeters")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("DangerZoneId");
+
+                    b.ToTable("DangerZones");
                 });
 
             modelBuilder.Entity("FYP_Project_II.Models.Driver", b =>
@@ -421,26 +490,89 @@ namespace FYP_Project_II.Data.Migrations
                     b.ToTable("ResourceStockLogs");
                 });
 
+            modelBuilder.Entity("FYP_Project_II.Models.SOSLog", b =>
+                {
+                    b.Property<string>("SOSLogId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SOSRequestId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("SOSLogId");
+
+                    b.ToTable("SOSLogs");
+                });
+
             modelBuilder.Entity("FYP_Project_II.Models.SOSRequest", b =>
                 {
                     b.Property<string>("SOSRequestId")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("AssignedResponderId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Latitude")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Status")
+                    b.Property<decimal>("Longitude")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SOSStatus")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("Status");
+
+                    b.Property<DateTime?>("SolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SolvedBy")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("UrgencyLevel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VictimContact")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VictimName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 

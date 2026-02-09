@@ -109,6 +109,42 @@ namespace FYP_Project_II.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CaseNotes",
+                columns: table => new
+                {
+                    CaseNoteId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    SOSRequestId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ResponderId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Note = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CaseNotes", x => x.CaseNoteId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "DangerZones",
+                columns: table => new
+                {
+                    DangerZoneId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CenterLatitude = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    CenterLongitude = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    RadiusMeters = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    DangerLevel = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ColorHex = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DangerZones", x => x.DangerZoneId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Drivers",
                 columns: table => new
                 {
@@ -247,13 +283,39 @@ namespace FYP_Project_II.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SOSLogs",
+                columns: table => new
+                {
+                    SOSLogId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    SOSRequestId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Details = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Action = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PerformedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SOSLogs", x => x.SOSLogId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SOSRequests",
                 columns: table => new
                 {
                     SOSRequestId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    VictimName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    VictimContact = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Location = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Latitude = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Longitude = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UrgencyLevel = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    AssignedResponderId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SolvedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    SolvedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -528,6 +590,12 @@ namespace FYP_Project_II.Data.Migrations
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "CaseNotes");
+
+            migrationBuilder.DropTable(
+                name: "DangerZones");
+
+            migrationBuilder.DropTable(
                 name: "Drivers");
 
             migrationBuilder.DropTable(
@@ -550,6 +618,9 @@ namespace FYP_Project_II.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "ShelterResources");
+
+            migrationBuilder.DropTable(
+                name: "SOSLogs");
 
             migrationBuilder.DropTable(
                 name: "SOSRequests");

@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.MODE === 'production'
     ? '' // Production: same origin
     : 'http://localhost:5191'; // Development: ASP.NET Core dev server
 
-import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi, ShelterRegistrationRequestApi } from './types';
+import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi, ShelterRegistrationRequestApi, SOS, SOSStatus, UrgencyLevel, CaseNote } from './types';
 
 // API Client with JWT token support
 class ApiClient {
@@ -31,8 +31,9 @@ class ApiClient {
             const response = await fetch(url, config);
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({ message: 'Request failed' }));
-                throw new Error(error.message || `HTTP ${response.status}`);
+                const error = await response.json().catch(() => null);
+                const message = error?.message ?? (response.status === 401 ? 'Session expired. Please log in again.' : `Request failed (${response.status})`);
+                throw new Error(message);
             }
 
             if (response.status === 204) {
@@ -400,6 +401,91 @@ export const resourceApi = {
             deliveredCount: number;
             generatedAt: string;
         }>>('/api/resources/usage-report'),
+};
+
+// SOS Monitoring API
+export const sosApi = {
+    getAll: (status?: string) => {
+        const params = status ? `?status=${encodeURIComponent(status)}` : '';
+        return apiClient.get<Array<{
+            id: string;
+            userId: string;
+            victimName: string;
+            victimPhone: string;
+            location: string;
+            latitude: number;
+            longitude: number;
+            description: string;
+            urgency: string;
+            status: string;
+            assignedResponder?: string;
+            assignedResponderName?: string;
+            createdAt: string;
+            updatedAt: string;
+            solvedAt?: string;
+        }>>(`/api/sos${params}`);
+    },
+
+    getById: (id: string) =>
+        apiClient.get<{
+            id: string;
+            victimName: string;
+            victimPhone: string;
+            location: string;
+            latitude: number;
+            longitude: number;
+            description: string;
+            urgency: string;
+            status: string;
+            assignedResponder?: string;
+            createdAt: string;
+            updatedAt: string;
+        }>(`/api/sos/${encodeURIComponent(id)}`),
+
+    getNotes: (id: string) =>
+        apiClient.get<Array<{ id: string; author: string; timestamp: string; note: string }>>(`/api/sos/${encodeURIComponent(id)}/notes`),
+
+    update: (id: string, data: { status?: SOSStatus; urgency?: UrgencyLevel; accept?: boolean }) =>
+        apiClient.put<{
+            id: string;
+            victimName: string;
+            victimPhone: string;
+            location: string;
+            latitude: number;
+            longitude: number;
+            description: string;
+            urgency: string;
+            status: string;
+            assignedResponder?: string;
+            createdAt: string;
+            updatedAt: string;
+            solvedAt?: string;
+        }>(`/api/sos/${encodeURIComponent(id)}`, data),
+
+    addNote: (id: string, note: string) =>
+        apiClient.post<{ id: string; author: string; timestamp: string; note: string }>(`/api/sos/${encodeURIComponent(id)}/notes`, { note }),
+
+    getDangerZones: () =>
+        apiClient.get<Array<{
+            id: string;
+            name: string;
+            description: string;
+            centerLatitude: number;
+            centerLongitude: number;
+            radiusMeters: number;
+            dangerLevel: string;
+            colorHex: string;
+        }>>('/api/sos/danger-zones'),
+};
+
+// Mobile SOS submission (no auth required)
+export const sosMobileApi = {
+    submit: (data: { userId?: string; victimName: string; victimContact: string; location?: string; latitude?: number; longitude?: number; description?: string; urgencyLevel?: string }) =>
+        fetch(`${API_BASE_URL}/api/sos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        }).then(res => res.json()),
 };
 
 export const shelterApi = {

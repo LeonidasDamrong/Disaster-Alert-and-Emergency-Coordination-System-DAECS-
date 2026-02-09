@@ -1,4 +1,5 @@
 using FYP_Project_II.Data;
+using FYP_Project_II.Hubs;
 using FYP_Project_II.Models;
 using FYP_Project_II.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -70,6 +71,20 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
+    // SignalR sends token via query string (WebSockets don't support headers)
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 // Configure CORS for React development
@@ -87,6 +102,17 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 builder.Services.AddHostedService<AlertBroadcastBackgroundService>();
+
+// SignalR for real-time SOS updates (use Azure SignalR in production via connection string)
+var signalRConnection = builder.Configuration.GetConnectionString("AzureSignalR");
+if (!string.IsNullOrEmpty(signalRConnection))
+{
+    builder.Services.AddSignalR().AddAzureSignalR(signalRConnection);
+}
+else
+{
+    builder.Services.AddSignalR();
+}
 
 var app = builder.Build();
 
@@ -118,6 +144,9 @@ app.UseAuthorization();
 
 // Enable API controllers (for /api/* endpoints)
 app.MapControllers();
+
+// SignalR hub for SOS real-time updates
+app.MapHub<SOSHub>("/hubs/sos");
 
 app.MapRazorPages();
 

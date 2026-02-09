@@ -25,7 +25,8 @@ namespace FYP_Project_II.Data
             await ResourceSeeder.SeedResourcesAsync(dbContext);
             await ResourceRequestSeeder.SeedResourceRequestsAsync(dbContext);
             await CommunicationSeeder.SeedCommunicationDataAsync(dbContext);
-            
+            await DangerZoneSeeder.SeedDangerZonesAsync(dbContext);
+
             await dbContext.SaveChangesAsync();
         }
     }
