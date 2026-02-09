@@ -25,12 +25,12 @@ namespace FYP_Project_II.Models
             // ManagedDisasters = new List<string>();
         }
 
-        // DisasterManager-specific methods
-        public void CreateAlert(string disasterInfo)
-        {
-            // TODO: Implement disaster alert creation logic
-            Console.WriteLine($"Disaster alert created: {disasterInfo}");
-        }
+        // // DisasterManager-specific methods
+        // public void CreateAlert(string disasterInfo)
+        // {
+        //     // TODO: Implement disaster alert creation logic
+        //     Console.WriteLine($"Disaster alert created: {disasterInfo}");
+        // }
 
         // public void AssignResponders(string disasterId, List<string> responderIds)
         // {
