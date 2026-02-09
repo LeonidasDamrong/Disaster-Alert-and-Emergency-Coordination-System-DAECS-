@@ -67,7 +67,7 @@ const AppRouter = () => {
       <Route
         path="/alerts"
         element={
-          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'First Responder']}>
+          <ProtectedRoute allowedRoles={['System Admin', 'Admin', 'First Responder', 'Shelter Manager', 'Resource Manager', 'Disaster Manager']}>
             <DashboardLayout>
               <AlertBroadcasting />
             </DashboardLayout>

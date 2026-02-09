@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FYP_Project_II.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260208144049_InitialCreate")]
+    [Migration("20260209053633_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -33,15 +33,28 @@ namespace FYP_Project_II.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ScheduledFor")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Severity")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TargetAudience")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -261,9 +274,11 @@ namespace FYP_Project_II.Data.Migrations
 
                     b.Property<string>("ShelterId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("EvacueeId");
+
+                    b.HasIndex("ShelterId");
 
                     b.ToTable("Evacuees");
                 });
@@ -571,12 +586,14 @@ namespace FYP_Project_II.Data.Migrations
 
                     b.Property<string>("ShelterId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("ShelterResourceId");
+
+                    b.HasIndex("ShelterId");
 
                     b.ToTable("ShelterResources");
                 });
@@ -776,6 +793,24 @@ namespace FYP_Project_II.Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("FYP_Project_II.Models.Evacuee", b =>
+                {
+                    b.HasOne("FYP_Project_II.Models.Shelter", null)
+                        .WithMany("Evacuees")
+                        .HasForeignKey("ShelterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FYP_Project_II.Models.ShelterResource", b =>
+                {
+                    b.HasOne("FYP_Project_II.Models.Shelter", null)
+                        .WithMany("ShelterResources")
+                        .HasForeignKey("ShelterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -825,6 +860,13 @@ namespace FYP_Project_II.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FYP_Project_II.Models.Shelter", b =>
+                {
+                    b.Navigation("Evacuees");
+
+                    b.Navigation("ShelterResources");
                 });
 #pragma warning restore 612, 618
         }

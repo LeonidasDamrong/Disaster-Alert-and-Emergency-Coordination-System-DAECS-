@@ -39,8 +39,57 @@ namespace FYP_Project_II.Data.Seeders
             {
                 var alerts = new[]
                 {
-                    new Alert { AlertId = "ALERT001", Title = "Red Alert: Flood", Description = "Immediate evacuation required for Zone A.", Severity = "Critical", Status = "Active", CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new Alert { AlertId = "ALERT002", Title = "Yellow Alert: Heavy Rain", Description = "Prepare for potential flooding.", Severity = "Warning", Status = "Active", CreatedAt = baseDate.AddHours(-2), UpdatedAt = baseDate.AddHours(-2) }
+                    new Alert
+                    {
+                        AlertId = "ALERT001",
+                        Title = "Flash Flood Warning - Kuala Lumpur",
+                        Description = "Heavy rainfall expected in the next 2 hours. Residents in low-lying areas are advised to move to higher ground immediately.",
+                        Severity = "Warning",
+                        Status = "Sent",
+                        TargetAudience = "Kuala Lumpur, Selangor",
+                        CreatedBy = "Ahmad bin Abdullah",
+                        SentAt = baseDate.AddHours(1),
+                        CreatedAt = baseDate.AddMinutes(55),
+                        UpdatedAt = baseDate.AddHours(1)
+                    },
+                    new Alert
+                    {
+                        AlertId = "ALERT002",
+                        Title = "Evacuation Order - Kampung Baru",
+                        Description = "Mandatory evacuation for Kampung Baru area. Report to nearest designated shelter immediately. Bring essential documents and medications.",
+                        Severity = "Emergency",
+                        Status = "Sent",
+                        TargetAudience = "Kampung Baru residents",
+                        CreatedBy = "Ahmad bin Abdullah",
+                        SentAt = baseDate.AddHours(2).AddMinutes(15),
+                        CreatedAt = baseDate.AddHours(2).AddMinutes(10),
+                        UpdatedAt = baseDate.AddHours(2).AddMinutes(15)
+                    },
+                    new Alert
+                    {
+                        AlertId = "ALERT003",
+                        Title = "Shelter Opening Notification",
+                        Description = "Additional shelter facilities now open at Dewan Komuniti Taman Melati. Capacity for 200 evacuees.",
+                        Severity = "Information",
+                        Status = "Scheduled",
+                        TargetAudience = "All Districts",
+                        CreatedBy = "Kumar Rajendran",
+                        ScheduledFor = baseDate.AddHours(6),
+                        CreatedAt = baseDate.AddHours(2).AddMinutes(30),
+                        UpdatedAt = baseDate.AddHours(2).AddMinutes(30)
+                    },
+                    new Alert
+                    {
+                        AlertId = "ALERT004",
+                        Title = "Weather Update",
+                        Description = "Storm warning canceled. Weather conditions improving.",
+                        Severity = "All Clear",
+                        Status = "Canceled",
+                        TargetAudience = "Penang",
+                        CreatedBy = "Ahmad bin Abdullah",
+                        CreatedAt = baseDate.AddHours(-1),
+                        UpdatedAt = baseDate.AddHours(-1)
+                    }
                 };
                 await dbContext.Alerts.AddRangeAsync(alerts);
                 Console.WriteLine("Seeded Alerts");

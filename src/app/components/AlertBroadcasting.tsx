@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -8,69 +8,133 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { AlertTriangle, Send, Calendar, XCircle } from 'lucide-react';
-import { mockAlerts } from '../lib/mockData';
-import { Alert, AlertType, AlertStatus } from '../lib/types';
+import { AlertTriangle, Send, Calendar, XCircle, Loader2 } from 'lucide-react';
+import { alertApi } from '../lib/api';
+import type { Alert as AlertType, AlertType as SeverityType, AlertStatus } from '../lib/types';
 import { toast } from 'sonner';
 
 export const AlertBroadcasting = () => {
-  const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
+  const [alerts, setAlerts] = useState<AlertType[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newAlert, setNewAlert] = useState({
     title: '',
     message: '',
-    type: 'Information' as AlertType,
+    type: 'Information' as SeverityType,
     targetAudience: '',
     scheduled: false,
     scheduledFor: ''
   });
 
-  const handleCreateAlert = (immediate: boolean) => {
-    const alert: Alert = {
-      id: `ALERT${Date.now()}`,
-      title: newAlert.title,
-      message: newAlert.message,
-      type: newAlert.type,
-      targetAudience: newAlert.targetAudience,
-      status: immediate ? 'Sent' : 'Scheduled',
-      createdBy: 'Ahmad bin Abdullah',
-      createdAt: new Date().toISOString(),
-      ...(immediate ? { sentAt: new Date().toISOString() } : { scheduledFor: newAlert.scheduledFor })
-    };
-
-    setAlerts(prev => [alert, ...prev]);
-    setIsCreateDialogOpen(false);
-    setNewAlert({
-      title: '',
-      message: '',
-      type: 'Information',
-      targetAudience: '',
-      scheduled: false,
-      scheduledFor: ''
-    });
-    toast.success(immediate ? 'Alert broadcasted successfully!' : 'Alert scheduled successfully!');
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true);
+      const data = await alertApi.getAll();
+      setAlerts(data.map(a => {
+        // #region agent log
+        const raw = a.scheduledFor ?? a.sentAt ?? a.createdAt;
+        if (raw) {
+          const d = new Date(raw);
+          fetch('http://127.0.0.1:7242/ingest/ea7a769f-3d28-4b8f-a0ad-ba511068bb19',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AlertBroadcasting.tsx:fetchAlerts',message:'datetime display',data:{rawFromApi:raw,displayed:raw ? d.toLocaleString('en-MY') : null,tzOffset:new Date().getTimezoneOffset()},timestamp:Date.now(),hypothesisId:'H3,H4'})}).catch(()=>{});
+        }
+        // #endregion
+        return {
+          id: a.id,
+          title: a.title,
+          message: a.message,
+          type: a.type as SeverityType,
+          targetAudience: a.targetAudience,
+          status: a.status as AlertStatus,
+          createdBy: a.createdBy,
+          createdAt: a.createdAt,
+          scheduledFor: a.scheduledFor ?? undefined,
+          sentAt: a.sentAt ?? undefined
+        };
+      }));
+    } catch (err) {
+      console.error('Failed to fetch alerts:', err);
+      toast.error('Failed to load alerts');
+      setAlerts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCancelAlert = (alertId: string) => {
-    setAlerts(prev =>
-      prev.map(alert =>
-        alert.id === alertId ? { ...alert, status: 'Canceled' as AlertStatus } : alert
-      )
-    );
-    toast.success('Alert canceled');
+  useEffect(() => {
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 30000); // Refetch every 30s so auto-broadcasts appear
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleCreateAlert = async (immediate: boolean) => {
+    if (!newAlert.title || !newAlert.message || !newAlert.targetAudience) {
+      toast.error('Please fill in Title, Message, and Target Audience');
+      return;
+    }
+    if (!immediate && !newAlert.scheduledFor) {
+      toast.error('Please select a date/time for scheduled broadcast');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      await alertApi.create({
+        title: newAlert.title,
+        message: newAlert.message,
+        type: newAlert.type,
+        targetAudience: newAlert.targetAudience,
+        scheduledFor: immediate ? null : newAlert.scheduledFor || null
+      });
+      setIsCreateDialogOpen(false);
+      setNewAlert({
+        title: '',
+        message: '',
+        type: 'Information',
+        targetAudience: '',
+        scheduled: false,
+        scheduledFor: ''
+      });
+      toast.success(immediate ? 'Alert broadcast successfully!' : 'Alert scheduled successfully!');
+      await fetchAlerts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create alert');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const getAlertTypeColor = (type: AlertType) => {
+  const handleCancelAlert = async (alertId: string) => {
+    try {
+      await alertApi.cancel(alertId);
+      toast.success('Alert canceled');
+      await fetchAlerts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel alert');
+    }
+  };
+
+  const handleBroadcastNow = async (alertId: string) => {
+    try {
+      await alertApi.broadcast(alertId);
+      toast.success('Alert broadcast successfully!');
+      await fetchAlerts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to broadcast alert');
+    }
+  };
+
+  const getAlertTypeColor = (type: SeverityType) => {
     switch (type) {
       case 'Emergency': return 'bg-red-100 text-red-800 border-red-300';
       case 'Warning': return 'bg-orange-100 text-orange-800 border-orange-300';
       case 'Information': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'All Clear': return 'bg-green-100 text-green-800 border-green-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold">Alert Broadcasting</h2>
@@ -109,7 +173,7 @@ export const AlertBroadcasting = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Alert Type *</Label>
-                  <Select value={newAlert.type} onValueChange={(value) => setNewAlert({ ...newAlert, type: value as AlertType })}>
+                  <Select value={newAlert.type} onValueChange={(value) => setNewAlert({ ...newAlert, type: value as SeverityType })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -142,18 +206,18 @@ export const AlertBroadcasting = () => {
                 <Button
                   onClick={() => handleCreateAlert(true)}
                   className="flex-1 bg-red-600 hover:bg-red-700 gap-2"
-                  disabled={!newAlert.title || !newAlert.message || !newAlert.targetAudience}
+                  disabled={!newAlert.title || !newAlert.message || !newAlert.targetAudience || isSubmitting}
                 >
-                  <Send className="h-4 w-4" />
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   Broadcast Immediately
                 </Button>
                 <Button
                   onClick={() => handleCreateAlert(false)}
                   variant="outline"
                   className="flex-1 gap-2"
-                  disabled={!newAlert.title || !newAlert.message || !newAlert.targetAudience || !newAlert.scheduledFor}
+                  disabled={!newAlert.title || !newAlert.message || !newAlert.targetAudience || !newAlert.scheduledFor || isSubmitting}
                 >
-                  <Calendar className="h-4 w-4" />
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
                   Schedule Broadcast
                 </Button>
               </div>
@@ -189,66 +253,93 @@ export const AlertBroadcasting = () => {
         </Card>
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>Alert History</CardTitle>
-          <CardDescription>Sent, scheduled, and canceled alerts</CardDescription>
+          <CardDescription>Sent, scheduled, and canceled alerts from database</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Target Audience</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {alerts.map((alert) => (
-                <TableRow key={alert.id}>
-                  <TableCell className="font-mono">{alert.id}</TableCell>
-                  <TableCell className="font-semibold">{alert.title}</TableCell>
-                  <TableCell>
-                    <Badge className={`${getAlertTypeColor(alert.type)} border`}>
-                      {alert.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{alert.targetAudience}</TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      alert.status === 'Sent' ? 'default' :
-                        alert.status === 'Scheduled' ? 'secondary' :
-                          'outline'
-                    }>
-                      {alert.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {alert.sentAt && `Sent: ${new Date(alert.sentAt).toLocaleString('en-MY')}`}
-                    {alert.scheduledFor && `Scheduled: ${new Date(alert.scheduledFor).toLocaleString('en-MY')}`}
-                    {!alert.sentAt && !alert.scheduledFor && `Created: ${new Date(alert.createdAt).toLocaleString('en-MY')}`}
-                  </TableCell>
-                  <TableCell>
-                    {alert.status === 'Scheduled' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleCancelAlert(alert.id)}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Cancel
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="p-0 sm:p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="min-w-0 overflow-hidden w-full">
+              <Table className="table-fixed w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-20">ID</TableHead>
+                    <TableHead className="min-w-0 max-w-[140px]">Title</TableHead>
+                    <TableHead className="w-24">Type</TableHead>
+                    <TableHead className="min-w-0 max-w-[120px]">Audience</TableHead>
+                    <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-40">Timestamp</TableHead>
+                    <TableHead className="w-44">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {alerts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                        No alerts found. Create your first alert to get started.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    alerts.map((alert) => (
+                      <TableRow key={alert.id}>
+                        <TableCell className="font-mono text-xs truncate">{alert.id}</TableCell>
+                        <TableCell className="font-semibold truncate max-w-[140px]" title={alert.title}>{alert.title}</TableCell>
+                        <TableCell>
+                          <Badge className={`${getAlertTypeColor(alert.type)} border text-xs`}>
+                            {alert.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="truncate max-w-[120px]" title={alert.targetAudience}>{alert.targetAudience}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            alert.status === 'Sent' ? 'default' :
+                              alert.status === 'Scheduled' ? 'secondary' :
+                                'outline'
+                          } className="text-xs">
+                            {alert.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {alert.sentAt && `Sent: ${new Date(alert.sentAt).toLocaleString('en-MY')}`}
+                          {alert.scheduledFor && !alert.sentAt && `Sched: ${new Date(alert.scheduledFor).toLocaleString('en-MY')}`}
+                          {!alert.sentAt && !alert.scheduledFor && `Created: ${new Date(alert.createdAt).toLocaleString('en-MY')}`}
+                        </TableCell>
+                        <TableCell>
+                          {alert.status === 'Scheduled' && (
+                            <div className="flex gap-1 flex-wrap">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 gap-1 text-xs h-7 px-2"
+                                onClick={() => handleBroadcastNow(alert.id)}
+                              >
+                                <Send className="h-3 w-3" />
+                                Now
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs h-7 px-2"
+                                onClick={() => handleCancelAlert(alert.id)}
+                              >
+                                <XCircle className="h-3 w-3" />
+                                Cancel
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

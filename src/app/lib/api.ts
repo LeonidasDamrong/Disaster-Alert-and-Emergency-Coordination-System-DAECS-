@@ -154,6 +154,99 @@ export const announcementApi = {
     delete: (id: string) => apiClient.delete<void>(`/api/announcements/${id}`)
 };
 
+// Alert Broadcasting API - accessible by all authenticated users
+export const alertApi = {
+    getAll: () => apiClient.get<Array<{
+        id: string;
+        title: string;
+        message: string;
+        type: string;
+        targetAudience: string;
+        status: string;
+        createdBy: string;
+        scheduledFor?: string | null;
+        sentAt?: string | null;
+        createdAt: string;
+    }>>('/api/alerts'),
+
+    getById: (id: string) =>
+        apiClient.get<{
+            id: string;
+            title: string;
+            message: string;
+            type: string;
+            targetAudience: string;
+            status: string;
+            createdBy: string;
+            scheduledFor?: string | null;
+            sentAt?: string | null;
+            createdAt: string;
+        }>(`/api/alerts/${encodeURIComponent(id)}`),
+
+    create: (data: { title: string; message: string; type: string; targetAudience: string; scheduledFor?: string | null }) => {
+        // #region agent log
+        const rawScheduledFor = data.scheduledFor;
+        const isoForApi = rawScheduledFor ? new Date(rawScheduledFor).toISOString() : null;
+        fetch('http://127.0.0.1:7242/ingest/ea7a769f-3d28-4b8f-a0ad-ba511068bb19',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:alertApi.create',message:'scheduledFor conversion',data:{rawScheduledFor,isoForApi,userTzOffset:new Date().getTimezoneOffset(),nowIso:new Date().toISOString()},timestamp:Date.now(),hypothesisId:'H1,H5'})}).catch(()=>{});
+        // #endregion
+        return apiClient.post<{
+            id: string;
+            title: string;
+            message: string;
+            type: string;
+            targetAudience: string;
+            status: string;
+            createdBy: string;
+            scheduledFor?: string | null;
+            sentAt?: string | null;
+            createdAt: string;
+        }>('/api/alerts', {
+            title: data.title,
+            message: data.message,
+            type: data.type,
+            targetAudience: data.targetAudience,
+            scheduledFor: isoForApi
+        });
+    },
+
+    update: (id: string, data: { title?: string; message?: string; type?: string; targetAudience?: string; scheduledFor?: string | null }) =>
+        apiClient.put<void>(`/api/alerts/${encodeURIComponent(id)}`, {
+            ...data,
+            scheduledFor: data.scheduledFor ? new Date(data.scheduledFor).toISOString() : data.scheduledFor
+        }),
+
+    delete: (id: string) =>
+        apiClient.delete<void>(`/api/alerts/${encodeURIComponent(id)}`),
+
+    broadcast: (id: string) =>
+        apiClient.post<{
+            id: string;
+            title: string;
+            message: string;
+            type: string;
+            targetAudience: string;
+            status: string;
+            createdBy: string;
+            scheduledFor?: string | null;
+            sentAt?: string | null;
+            createdAt: string;
+        }>(`/api/alerts/${encodeURIComponent(id)}/broadcast`),
+
+    cancel: (id: string) =>
+        apiClient.post<{
+            id: string;
+            title: string;
+            message: string;
+            type: string;
+            targetAudience: string;
+            status: string;
+            createdBy: string;
+            scheduledFor?: string | null;
+            sentAt?: string | null;
+            createdAt: string;
+        }>(`/api/alerts/${encodeURIComponent(id)}/cancel`),
+};
+
 // Map backend shelter to UI Shelter (without evacuees/resources - load separately)
 function mapShelterApiToShelter(s: ShelterApi, evacuees: Evacuee[] = [], resources: string[] = []): Shelter {
     return {

@@ -49,7 +49,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['System Admin', 'Admin', 'First Responder', 'Shelter Manager', 'Resource Manager'] },
     { path: '/sos', icon: Radio, label: 'SOS Monitoring', roles: ['System Admin', 'Admin', 'First Responder'] },
-    { path: '/alerts', icon: AlertTriangle, label: 'Alert Broadcasting', roles: ['System Admin', 'Admin', 'First Responder'] },
+    { path: '/alerts', icon: AlertTriangle, label: 'Alert Broadcasting', roles: ['System Admin', 'Admin', 'First Responder', 'Shelter Manager', 'Resource Manager', 'Disaster Manager'] },
     { path: '/shelters', icon: HomeIcon, label: 'Shelter Management', roles: ['System Admin', 'Admin', 'Shelter Manager'] },
     { path: '/resources', icon: Package, label: 'Resource Management', roles: ['System Admin', 'Admin', 'Resource Manager', 'Shelter Manager', 'First Responder', 'Disaster Manager'] },
     { path: '/admin', icon: Users, label: 'Admin Management', roles: ['System Admin', 'Admin'] },
@@ -127,7 +127,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6 ml-64">
+        <main className="flex-1 min-w-0 p-6 ml-64">
           {children}
         </main>
       </div>

@@ -1,5 +1,6 @@
 using FYP_Project_II.Data;
 using FYP_Project_II.Models;
+using FYP_Project_II.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -85,6 +86,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddHostedService<AlertBroadcastBackgroundService>();
 
 var app = builder.Build();
 
