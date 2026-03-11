@@ -811,7 +811,7 @@ function ResourceUsageReportModal({ open, onOpenChange, data }: { open: boolean;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl sm:max-w-7xl max-h-[85vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-4xl sm:max-w-7xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         <DialogHeader className="p-6 pb-2">
           <DialogTitle>Resource Usage Report</DialogTitle>
           <DialogDescription>Overview of resource inventory and usage across all warehouses.</DialogDescription>
@@ -828,7 +828,7 @@ function ResourceUsageReportModal({ open, onOpenChange, data }: { open: boolean;
           </Button>
         </div>
 
-        <div className="flex-1 overflow-auto p-6 pt-2">
+        <div className="flex-1 min-h-0 overflow-auto p-6 pt-2 scrollbar-dialog">
           <div className="border rounded-md">
             <Table>
               <TableHeader>

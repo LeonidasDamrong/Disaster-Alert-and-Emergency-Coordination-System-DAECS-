@@ -208,7 +208,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                       </Button>
                     )}
                   </div>
-                  <div className="max-h-80 overflow-y-auto">
+                  <div className="max-h-80 overflow-y-auto scrollbar-dialog">
                     {notifications.length === 0 ? (
                       <div className="px-3 py-4 text-sm text-gray-500 text-center">
                         No notifications yet.
@@ -290,7 +290,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 p-6 ml-64">
+        <main className="flex-1 min-w-0 p-6 ml-64 flex flex-col min-h-0">
           {children}
         </main>
       </div>

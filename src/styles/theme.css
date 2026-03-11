@@ -179,3 +179,28 @@
     line-height: 1.5;
   }
 }
+
+/* Rounded scrollbar for dialog/popover scroll areas */
+.scrollbar-dialog {
+  --scrollbar-dialog-track-radius: 0 0 var(--radius-lg) 0;
+  --scrollbar-dialog-thumb: var(--border);
+}
+.scrollbar-dialog::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-dialog::-webkit-scrollbar-track {
+  border-radius: var(--scrollbar-dialog-track-radius, 0 0 0.5rem 0);
+  background: transparent;
+}
+.scrollbar-dialog::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: var(--scrollbar-dialog-thumb, rgba(0, 0, 0, 0.15));
+}
+.scrollbar-dialog::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+.scrollbar-dialog {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-dialog-thumb, rgba(0, 0, 0, 0.15)) transparent;
+}

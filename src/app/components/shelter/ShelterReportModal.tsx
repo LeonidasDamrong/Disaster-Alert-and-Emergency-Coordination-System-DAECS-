@@ -107,13 +107,13 @@ export function ShelterReportModal({ open, onOpenChange, report }: ShelterReport
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
                 <DialogHeader>
                     <DialogTitle>Shelter Status Report</DialogTitle>
                     <DialogDescription>Snapshot of shelter status, capacity, and resources.</DialogDescription>
                 </DialogHeader>
 
-                <div id="shelter-generated-report-print" className="space-y-6 py-4">
+                <div id="shelter-generated-report-print" className="space-y-6 py-4 flex-1 min-h-0 overflow-y-auto scrollbar-dialog">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <p className="text-sm font-medium text-gray-500">Shelter Name</p>

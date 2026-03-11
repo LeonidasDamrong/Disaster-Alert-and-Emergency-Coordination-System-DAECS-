@@ -407,7 +407,7 @@ export const AdminShelterView = () => {
                 <div className="flex gap-2 flex-wrap">
                   <Dialog onOpenChange={(open) => open && loadShelterDetails(shelter.id)}>
                     <DialogTrigger asChild><Button variant="outline" size="sm" className="gap-2"><Users className="h-4 w-4" />View Evacuees ({current.evacuees.length > 0 ? current.evacuees.length : current.currentOccupancy})</Button></DialogTrigger>
-                    <DialogContent className="w-[90vw] max-w-none sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="w-[90vw] max-w-none sm:max-w-[90vw] max-h-[90vh] overflow-y-auto scrollbar-dialog">
                       <DialogHeader><DialogTitle>Evacuees at {current.name}</DialogTitle></DialogHeader>
                       {detailsLoading ? <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-gray-500" /></div> : (
                         <div className="space-y-4">

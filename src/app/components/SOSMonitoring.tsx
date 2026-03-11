@@ -364,17 +364,20 @@ export const SOSMonitoring = () => {
 
       {/* SOS Details Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl h-[90vh] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           {selectedSOS && (
             <>
-              <DialogHeader>
-                <DialogTitle>SOS Request Details - {selectedSOS.id}</DialogTitle>
-                <DialogDescription>
-                  Created: {new Date(selectedSOS.createdAt).toLocaleString('en-MY')}
-                </DialogDescription>
-              </DialogHeader>
+              <div className="shrink-0 px-6 pt-6 pb-2">
+                <DialogHeader>
+                  <DialogTitle>SOS Request Details - {selectedSOS.id}</DialogTitle>
+                  <DialogDescription>
+                    Created: {new Date(selectedSOS.createdAt).toLocaleString('en-MY')}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
 
-              <div className="space-y-6">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-b-lg pr-1 scrollbar-dialog">
+                <div className="px-6 pb-6 pt-2 space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
@@ -409,10 +412,6 @@ export const SOSMonitoring = () => {
                         </Button>
                       )}
                     </div>
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label>Description of Situation</Label>
-                    <p className="p-3 bg-gray-50 rounded border">{selectedSOS.description || 'No description'}</p>
                   </div>
                 </div>
 
@@ -539,7 +538,7 @@ export const SOSMonitoring = () => {
                         <FileText className="h-4 w-4" />
                         Case Notes
                       </Label>
-                      <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3">
+                      <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3 scrollbar-dialog">
                         {displayNotes.length === 0 ? (
                           <p className="text-sm text-gray-500 text-center py-4">No notes yet</p>
                         ) : (
@@ -584,7 +583,7 @@ export const SOSMonitoring = () => {
                       <FileText className="h-4 w-4" />
                       Case Notes
                     </Label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3">
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3 scrollbar-dialog">
                       {displayNotes.length === 0 ? (
                         <p className="text-sm text-gray-500 text-center py-4">No notes yet</p>
                       ) : (
@@ -604,6 +603,7 @@ export const SOSMonitoring = () => {
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             </>
           )}
