@@ -17,6 +17,11 @@ import { Badge } from './ui/badge';
 import { systemSettingsApi } from '../lib/api';
 import { SystemSettings } from '../lib/types';
 import { mockSystemSettings } from '../lib/mockData';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { useNotifications } from '../context/NotificationContext';
+import { useSOSSignalR } from '../hooks/useSOSSignalR';
+import { useResourceSignalR } from '../hooks/useResourceSignalR';
+import { useNotificationSignalR } from '../hooks/useNotificationSignalR';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -27,6 +32,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [settings, setSettings] = useState<SystemSettings>(mockSystemSettings);
+   const { notifications, unreadCount, addNotification, markAllRead, markAsRead } = useNotifications();
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -40,6 +46,102 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
     fetchSettings();
   }, [location.pathname]); // Re-fetch on navigation to ensure updates are reflected
+
+  useSOSSignalR(
+    (payload) => {
+      if (!user) return;
+
+      if (user.role === 'Admin' || user.role === 'System Admin') {
+        addNotification({
+          title: 'New SOS received',
+          message: `${payload.victimName} • ${payload.urgency} • ${payload.location}`,
+          type: 'sos',
+          link: '/sos',
+          role: user.role,
+        });
+      } else if (user.role === 'First Responder') {
+        addNotification({
+          title: 'New SOS request',
+          message: `${payload.victimName} • ${payload.urgency}`,
+          type: 'sos',
+          link: '/sos',
+          role: user.role,
+        });
+      }
+    },
+    (payload) => {
+      if (!user) return;
+      if (user.role === 'First Responder' && payload.assignedResponder === user.name) {
+        addNotification({
+          title: 'SOS updated',
+          message: `${payload.victimName} is now ${payload.status}`,
+          type: 'sos',
+          link: '/sos',
+          role: user.role,
+        });
+      }
+    },
+    !!user
+  );
+
+  useResourceSignalR(
+    (payload) => {
+      if (!user) return;
+      if (user.role === 'Resource Manager' || user.role === 'Admin' || user.role === 'System Admin') {
+        const urgency = (payload.urgency || 'Medium').toString();
+        addNotification({
+          title: `${urgency} resource request`,
+          message: `${payload.itemName} (${payload.quantity} ${payload.unit}) • ${payload.destination || 'No destination'}`,
+          type: 'resource',
+          link: '/resources',
+          role: user.role,
+        });
+      }
+    },
+    !!user
+  );
+
+  useNotificationSignalR(
+    (payload) => {
+      if (!user) return;
+      const isCreator = (user.name && payload.createdBy && user.name === payload.createdBy) || (user.userId && payload.createdBy === user.userId);
+      if (isCreator) {
+        addNotification({
+          title: 'Announcement created',
+          message: 'Your announcement was published.',
+          type: 'announcement',
+          link: '/admin',
+        });
+      } else {
+        addNotification({
+          title: payload.title,
+          message: payload.content || payload.title,
+          type: 'announcement',
+          link: '/admin',
+        });
+      }
+    },
+    (payload) => {
+      if (!user) return;
+      const isCreator = (user.name && payload.createdBy && user.name === payload.createdBy) || (user.userId && payload.createdBy === user.userId);
+      if (isCreator) {
+        addNotification({
+          title: 'Alert broadcast',
+          message: 'Your alert was sent successfully.',
+          type: 'alert',
+          link: '/alerts',
+        });
+      } else {
+        addNotification({
+          title: payload.title,
+          message: payload.message || payload.title,
+          type: 'alert',
+          link: '/alerts',
+        });
+      }
+    },
+    !!user
+  );
 
   const handleLogout = () => {
     logout();
@@ -78,12 +180,73 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             </div>
 
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full text-xs text-white flex items-center justify-center">
-                  3
-                </span>
-              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-h-4 min-w-4 px-1 bg-red-600 rounded-full text-[10px] text-white flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80 p-0">
+                  <div className="flex items-center justify-between px-3 py-2 border-b">
+                    <span className="text-sm font-semibold">Notifications</span>
+                    {notifications.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAllRead();
+                        }}
+                      >
+                        Mark all read
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                        No notifications yet.
+                      </div>
+                    ) : (
+                      <ul className="divide-y">
+                        {notifications.map((n) => (
+                          <li
+                            key={n.id}
+                            className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 ${
+                              !n.read ? 'bg-red-50/60' : ''
+                            }`}
+                            onClick={() => {
+                              markAsRead(n.id);
+                              if (n.link) {
+                                navigate(n.link);
+                              }
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-medium text-gray-900">{n.title}</p>
+                                <p className="text-xs text-gray-600 mt-0.5">{n.message}</p>
+                              </div>
+                              <span className="mt-0.5 text-[10px] text-gray-400">
+                                {new Date(n.createdAt).toLocaleTimeString('en-MY', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               <div className="flex items-center gap-3 border-l pl-4">
                 <div className="text-right">

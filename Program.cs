@@ -2,6 +2,7 @@ using FYP_Project_II.Data;
 using FYP_Project_II.Hubs;
 using FYP_Project_II.Models;
 using FYP_Project_II.Services;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -103,6 +104,13 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 builder.Services.AddHostedService<AlertBroadcastBackgroundService>();
 
+// Azure Blob Storage (for SOS completion proof images)
+var blobConnectionString = builder.Configuration.GetConnectionString("AzureBlobStorage");
+if (!string.IsNullOrWhiteSpace(blobConnectionString))
+{
+    builder.Services.AddSingleton(new BlobServiceClient(blobConnectionString));
+}
+
 // SignalR for real-time SOS updates (use Azure SignalR in production via connection string)
 var signalRConnection = builder.Configuration.GetConnectionString("AzureSignalR");
 if (!string.IsNullOrEmpty(signalRConnection))
@@ -145,8 +153,10 @@ app.UseAuthorization();
 // Enable API controllers (for /api/* endpoints)
 app.MapControllers();
 
-// SignalR hub for SOS real-time updates
+// SignalR hubs
 app.MapHub<SOSHub>("/hubs/sos");
+app.MapHub<ResourceHub>("/hubs/resources");
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.MapRazorPages();
 

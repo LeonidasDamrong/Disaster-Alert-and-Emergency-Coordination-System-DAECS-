@@ -1,8 +1,10 @@
 using FYP_Project_II.Data;
+using FYP_Project_II.Hubs;
 using FYP_Project_II.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -14,11 +16,13 @@ namespace FYP_Project_II.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IHubContext<NotificationHub> _notificationHub;
 
-        public AnnouncementController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public AnnouncementController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IHubContext<NotificationHub> notificationHub)
         {
             _context = context;
             _userManager = userManager;
+            _notificationHub = notificationHub;
         }
 
         [HttpGet]
@@ -74,6 +78,17 @@ namespace FYP_Project_II.Controllers
             await _context.SaveChangesAsync();
 
             await LogAuditAsync("Create Announcement", $"Created announcement: {announcement.Title}");
+
+            // Broadcast to all users (frontend shows full content to others, "Announcement created" to creator)
+            await _notificationHub.Clients.All.SendAsync("AnnouncementCreated", new
+            {
+                id = announcement.Id,
+                title = announcement.Title,
+                content = announcement.Content,
+                priority = announcement.Priority,
+                createdBy = announcement.CreatedBy,
+                createdAt = announcement.CreatedAt
+            });
 
             return CreatedAtAction(nameof(GetAnnouncement), new { id = announcement.Id }, announcement);
         }

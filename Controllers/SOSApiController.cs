@@ -1,6 +1,9 @@
 using FYP_Project_II.Data;
 using FYP_Project_II.Hubs;
 using FYP_Project_II.Models;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +11,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace FYP_Project_II.Controllers
 {
@@ -19,17 +23,23 @@ namespace FYP_Project_II.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IHubContext<SOSHub> _hubContext;
         private readonly ILogger<SOSApiController> _logger;
+        private readonly BlobServiceClient? _blobServiceClient;
+        private readonly IConfiguration _configuration;
 
         public SOSApiController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IHubContext<SOSHub> hubContext,
-            ILogger<SOSApiController> logger)
+            ILogger<SOSApiController> logger,
+            IConfiguration configuration,
+            BlobServiceClient? blobServiceClient = null)
         {
             _context = context;
             _userManager = userManager;
             _hubContext = hubContext;
             _logger = logger;
+            _configuration = configuration;
+            _blobServiceClient = blobServiceClient;
         }
 
         private static string ToUtcIso(DateTime dt) =>
@@ -38,7 +48,70 @@ namespace FYP_Project_II.Controllers
         private static string? ToUtcIso(DateTime? dt) =>
             dt.HasValue ? ToUtcIso(dt.Value) : null;
 
-        private static object MapToDto(SOSRequest r) => new
+        private string? TryGetProofImageViewUrl(string? storedUrlOrUri)
+        {
+            if (string.IsNullOrWhiteSpace(storedUrlOrUri)) return null;
+
+            // If it's already a SAS URL, keep it.
+            if (storedUrlOrUri.Contains("sig=", StringComparison.OrdinalIgnoreCase)) return storedUrlOrUri;
+
+            if (_blobServiceClient == null) return storedUrlOrUri;
+
+            var containerName = _configuration["Storage:SOSProofContainer"];
+            if (string.IsNullOrWhiteSpace(containerName)) containerName = "sos-proofs";
+
+            if (!Uri.TryCreate(storedUrlOrUri, UriKind.Absolute, out var uri)) return storedUrlOrUri;
+
+            // Expected format: https://{account}.blob.core.windows.net/{container}/{blobPath...}
+            var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length < 2) return storedUrlOrUri;
+
+            var containerFromUrl = segments[0];
+            if (!string.Equals(containerFromUrl, containerName, StringComparison.OrdinalIgnoreCase))
+            {
+                // If container differs, still try using containerFromUrl.
+                containerName = containerFromUrl;
+            }
+
+            var blobName = string.Join('/', segments.Skip(1));
+            var blob = _blobServiceClient.GetBlobContainerClient(containerName).GetBlobClient(blobName);
+            if (!blob.CanGenerateSasUri) return storedUrlOrUri;
+
+            var sas = new BlobSasBuilder
+            {
+                BlobContainerName = containerName,
+                BlobName = blobName,
+                Resource = "b",
+                ExpiresOn = DateTimeOffset.UtcNow.AddHours(12)
+            };
+            sas.SetPermissions(BlobSasPermissions.Read);
+
+            return blob.GenerateSasUri(sas).ToString();
+        }
+
+        private async Task<(string? assignedResponder, string? assignedResponderName)> ResolveAssignedResponderAsync(SOSRequest r)
+        {
+            var assigned = r.AssignedResponderId;
+            if (string.IsNullOrWhiteSpace(assigned))
+                return (null, null);
+
+            // If AssignedResponderId is an Identity userId (GUID), resolve to username/name.
+            var user = await _userManager.FindByIdAsync(assigned);
+            if (user == null)
+            {
+                // Otherwise treat it as already a username (seeded data).
+                return (assigned, assigned);
+            }
+
+            var username = user.UserName ?? assigned;
+            var displayName = string.IsNullOrWhiteSpace(user.Name) ? username : user.Name;
+            return (username, displayName);
+        }
+
+        private async Task<object> MapToDtoAsync(SOSRequest r)
+        {
+            var (assignedResponder, assignedResponderName) = await ResolveAssignedResponderAsync(r);
+            return new
         {
             id = r.SOSRequestId,
             userId = r.UserId,
@@ -50,12 +123,16 @@ namespace FYP_Project_II.Controllers
             description = r.Description ?? "",
             urgency = r.UrgencyLevel ?? "Medium",
             status = r.SOSStatus ?? "New",
-            assignedResponder = r.AssignedResponderId,
-            assignedResponderName = (string?)null,
+            assignedResponder = assignedResponder,
+            assignedResponderName = assignedResponderName,
             createdAt = ToUtcIso(r.RequestedAt),
             updatedAt = ToUtcIso(r.UpdatedAt),
-            solvedAt = ToUtcIso(r.SolvedAt)
+            solvedAt = ToUtcIso(r.SolvedAt),
+            completionProofImageUrl = TryGetProofImageViewUrl(r.CompletionProofImageUrl),
+            completionProofUploadedAt = ToUtcIso(r.CompletionProofUploadedAt),
+            completionProofUploadedBy = r.CompletionProofUploadedBy
         };
+        }
 
         /// <summary>
         /// Mobile API: Submit SOS request. No authentication required for emergency access.
@@ -107,9 +184,10 @@ namespace FYP_Project_II.Controllers
 
             _context.SOSRequests.Add(sos);
 
+            var createdLogId = $"LOG_{sosId}_{Guid.NewGuid():N}";
             var log = new SOSLog
             {
-                SOSLogId = $"LOG_{sosId}_{Guid.NewGuid():N}".Substring(0, 50),
+                SOSLogId = createdLogId.Length <= 50 ? createdLogId : createdLogId[..50],
                 SOSRequestId = sosId,
                 Action = "Created",
                 Details = $"SOS request submitted by {request.VictimName}",
@@ -120,7 +198,7 @@ namespace FYP_Project_II.Controllers
 
             await _context.SaveChangesAsync();
 
-            var dto = MapToDto(sos);
+            var dto = await MapToDtoAsync(sos);
             await _hubContext.Clients.All.SendAsync("SOSReceived", dto);
             return CreatedAtAction(nameof(GetSOS), new { id = sosId }, dto);
         }
@@ -138,7 +216,12 @@ namespace FYP_Project_II.Controllers
                 query = query.Where(s => s.SOSStatus == status);
             }
             var list = await query.OrderByDescending(s => s.RequestedAt).ToListAsync();
-            return Ok(list.Select(MapToDto));
+            var dtos = new List<object>(list.Count);
+            foreach (var r in list)
+            {
+                dtos.Add(await MapToDtoAsync(r));
+            }
+            return Ok(dtos);
         }
 
         [HttpGet("{id}")]
@@ -147,7 +230,7 @@ namespace FYP_Project_II.Controllers
         {
             var sos = await _context.SOSRequests.FindAsync(id);
             if (sos == null) return NotFound();
-            return Ok(MapToDto(sos));
+            return Ok(await MapToDtoAsync(sos));
         }
 
         [HttpGet("{id}/notes")]
@@ -229,9 +312,98 @@ namespace FYP_Project_II.Controllers
             sos.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            var dto = MapToDto(sos);
+            var dto = await MapToDtoAsync(sos);
             await _hubContext.Clients.All.SendAsync("SOSUpdated", dto);
             return Ok(dto);
+        }
+
+        [HttpPost("{id}/completion-proof")]
+        [Authorize]
+        [RequestSizeLimit(6_000_000)] // ~6MB
+        public async Task<ActionResult<object>> UploadCompletionProof(string id, [FromForm] IFormFile? file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Image file is required." });
+
+            var sos = await _context.SOSRequests.FindAsync(id);
+            if (sos == null) return NotFound(new { message = "SOS request not found." });
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "Unauthorized." });
+
+            // Only allow assigned responder.
+            // Note: some existing data uses username for AssignedResponderId, while new accepts use Identity userId.
+            var userName = User.Identity?.Name;
+            var appUser = await _userManager.FindByIdAsync(userId);
+            var userUserName = appUser?.UserName;
+
+            if (!string.IsNullOrEmpty(sos.AssignedResponderId))
+            {
+                var assigned = sos.AssignedResponderId;
+                var ok =
+                    string.Equals(assigned, userId, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(userName) && string.Equals(assigned, userName, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(userUserName) && string.Equals(assigned, userUserName, StringComparison.OrdinalIgnoreCase));
+
+                if (!ok) return Forbid();
+            }
+
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "image/jpeg",
+                "image/png",
+                "image/webp"
+            };
+            if (!allowed.Contains(file.ContentType))
+                return BadRequest(new { message = "Only JPG, PNG, or WEBP images are allowed." });
+            if (file.Length > 5_000_000)
+                return BadRequest(new { message = "Image must be 5MB or less." });
+
+            var ext = Path.GetExtension(file.FileName);
+            if (string.IsNullOrWhiteSpace(ext)) ext = file.ContentType switch
+            {
+                "image/png" => ".png",
+                "image/webp" => ".webp",
+                _ => ".jpg"
+            };
+            ext = Regex.Replace(ext, @"[^a-zA-Z0-9\.]", "");
+            if (ext.Length > 10) ext = ext[..10];
+
+            if (_blobServiceClient == null)
+            {
+                return StatusCode(500, new { message = "Azure Blob Storage is not configured on the server." });
+            }
+
+            var containerName = _configuration["Storage:SOSProofContainer"];
+            if (string.IsNullOrWhiteSpace(containerName)) containerName = "sos-proofs";
+
+            var container = _blobServiceClient.GetBlobContainerClient(containerName);
+            await container.CreateIfNotExistsAsync();
+
+            var blobName = $"sos/{id}/completion-proof/{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{ext}";
+            var blob = container.GetBlobClient(blobName);
+
+            await using (var stream = file.OpenReadStream())
+            {
+                await blob.UploadAsync(stream, new BlobUploadOptions
+                {
+                    HttpHeaders = new BlobHttpHeaders
+                    {
+                        ContentType = file.ContentType
+                    }
+                });
+            }
+
+            // Store blob URL (ensure container has appropriate read access, or later switch to SAS URLs)
+            sos.CompletionProofImageUrl = blob.Uri.ToString();
+            sos.CompletionProofUploadedAt = DateTime.UtcNow;
+            sos.CompletionProofUploadedBy = appUser?.Name ?? userUserName ?? userName ?? userId;
+            sos.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(await MapToDtoAsync(sos));
         }
 
         [HttpPost("{id}/notes")]

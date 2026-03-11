@@ -1,13 +1,59 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { AlertTriangle, Users, Home, Package, Radio, Activity } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { mockSOSRequests, mockAlerts, mockShelters, mockResourceRequests } from '../lib/mockData';
+import { announcementApi } from '../lib/api';
+import type { Announcement } from '../lib/types';
+import { useNotificationSignalR } from '../hooks/useNotificationSignalR';
 
 export const Dashboard = () => {
   const { user } = useAuth();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+
+  useEffect(() => {
+    const loadAnnouncements = async () => {
+      try {
+        setLoadingAnnouncements(true);
+        const data = await announcementApi.getAll();
+        setAnnouncements(data);
+      } catch (err) {
+        console.error('Failed to load announcements for dashboard', err);
+      } finally {
+        setLoadingAnnouncements(false);
+      }
+    };
+    loadAnnouncements();
+  }, []);
+
+  useNotificationSignalR(
+    (payload) => {
+      setAnnouncements((prev) => {
+        if (prev.some(a => a.id === payload.id)) return prev;
+        const createdAt = payload.createdAt || new Date().toISOString();
+        const newItem: Announcement = {
+          id: payload.id,
+          title: payload.title,
+          content: payload.content,
+          priority: (payload.priority as any) ?? 'Low',
+          isActive: true,
+          createdBy: payload.createdBy,
+          createdAt,
+        };
+        return [newItem, ...prev];
+      });
+    },
+    undefined,
+    true
+  );
+
+  const recentAnnouncements = useMemo(
+    () => announcements.slice(0, 5),
+    [announcements]
+  );
 
   // Statistics
   const stats = [
@@ -67,6 +113,49 @@ export const Dashboard = () => {
         <h2 className="text-3xl font-bold">Welcome, {user?.name}</h2>
         <p className="text-gray-600">Emergency Response Dashboard - {new Date().toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>
+
+      {/* Announcements visible to all users */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Announcements</CardTitle>
+          <CardDescription>Latest system-wide messages</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingAnnouncements && announcements.length === 0 ? (
+            <p className="text-sm text-gray-500">Loading announcements...</p>
+          ) : recentAnnouncements.length === 0 ? (
+            <p className="text-sm text-gray-500">No announcements available.</p>
+          ) : (
+            <div className="space-y-3">
+              {recentAnnouncements.map((a) => (
+                <div key={a.id} className="p-3 border rounded-lg flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{a.title}</p>
+                      <Badge
+                        className={
+                          a.priority === 'High'
+                            ? 'bg-red-100 text-red-800'
+                            : a.priority === 'Medium'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }
+                      >
+                        {a.priority}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{a.content}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      By {a.createdBy}{' '}
+                      • {new Date(a.createdAt).toLocaleString('en-MY', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Statistics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

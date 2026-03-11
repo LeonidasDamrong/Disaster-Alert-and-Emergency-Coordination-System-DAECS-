@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FYP_Project_II.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260209154837_InitialCreate")]
+    [Migration("20260311091229_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -525,6 +525,15 @@ namespace FYP_Project_II.Data.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("AssignedResponderId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompletionProofImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("CompletionProofUploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CompletionProofUploadedBy")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")

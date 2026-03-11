@@ -14,10 +14,28 @@ namespace FYP_Project_II.Data.Seeders
                 var resources = await dbContext.Resources.ToListAsync();
                 if (resources.Count == 0) return;
 
+                // Prefer the known seeded IDs, but fall back to any available resources
+                // (in case the database already has resources with different IDs).
                 var res001 = resources.FirstOrDefault(r => r.ResourceItemId == "RES001");
                 var res002 = resources.FirstOrDefault(r => r.ResourceItemId == "RES002");
                 var res003 = resources.FirstOrDefault(r => r.ResourceItemId == "RES003");
-                if (res001 == null || res002 == null || res003 == null) return;
+
+                if (res001 == null || res002 == null || res003 == null)
+                {
+                    var fallback = resources
+                        .OrderBy(r => r.ResourceItemId)
+                        .Take(3)
+                        .ToArray();
+                    if (fallback.Length < 3) return;
+                    res001 ??= fallback[0];
+                    res002 ??= fallback[1];
+                    res003 ??= fallback[2];
+                }
+
+                // Ensure required string fields are not empty
+                res001.Unit = string.IsNullOrWhiteSpace(res001.Unit) ? "units" : res001.Unit;
+                res002.Unit = string.IsNullOrWhiteSpace(res002.Unit) ? "units" : res002.Unit;
+                res003.Unit = string.IsNullOrWhiteSpace(res003.Unit) ? "units" : res003.Unit;
 
                 var requests = new[]
                 {

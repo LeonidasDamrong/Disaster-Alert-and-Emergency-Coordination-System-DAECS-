@@ -1,8 +1,10 @@
 using FYP_Project_II.Data;
+using FYP_Project_II.Hubs;
 using FYP_Project_II.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -14,11 +16,13 @@ namespace FYP_Project_II.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IHubContext<ResourceHub> _resourceHub;
 
-        public ResourceController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public ResourceController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IHubContext<ResourceHub> resourceHub)
         {
             _context = context;
             _userManager = userManager;
+            _resourceHub = resourceHub;
         }
 
         private string? GetCurrentUserName() => User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity?.Name;
@@ -385,6 +389,25 @@ namespace FYP_Project_II.Controllers
             _context.ResourceRequests.Add(request);
             await _context.SaveChangesAsync();
             await LogAuditAsync("Resource Request", $"Requested {dto.Quantity} {resource.Name} by {request.RequestedBy}");
+
+            // Notify resource managers for Medium, High, and Critical (not Low).
+            var notifyUrgencies = new[] { "Critical", "High", "Medium" };
+            if (request.Urgency != null && notifyUrgencies.Contains(request.Urgency, StringComparer.OrdinalIgnoreCase))
+            {
+                await _resourceHub.Clients.Group("ResourceManagers").SendAsync("ResourceRequestCritical", new
+                {
+                    id = request.ResourceRequestId,
+                    warehouseId = request.WarehouseId,
+                    resourceItemId = request.ResourceItemId,
+                    itemName = request.ItemName,
+                    quantity = request.Quantity,
+                    unit = request.Unit,
+                    destination = request.Destination,
+                    requestedBy = request.RequestedBy,
+                    urgency = request.Urgency,
+                    requestedAt = request.RequestedAt
+                });
+            }
             return CreatedAtAction(nameof(GetResourceRequests), new { }, request);
         }
 

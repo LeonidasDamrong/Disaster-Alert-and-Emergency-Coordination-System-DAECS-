@@ -1,8 +1,10 @@
 using FYP_Project_II.Data;
+using FYP_Project_II.Hubs;
 using FYP_Project_II.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
@@ -16,11 +18,13 @@ namespace FYP_Project_II.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IHubContext<NotificationHub> _notificationHub;
 
-        public AlertsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public AlertsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IHubContext<NotificationHub> notificationHub)
         {
             _context = context;
             _userManager = userManager;
+            _notificationHub = notificationHub;
         }
 
         private static string? ToUtcIso(DateTime? dt) =>
@@ -134,6 +138,21 @@ namespace FYP_Project_II.Controllers
             await _context.SaveChangesAsync();
             await LogAuditAsync("Create Alert", $"Created alert: {alert.Title} (ID: {alertId})");
 
+            // When sent immediately, broadcast to all (creator sees "Alert broadcast"; others see full alert)
+            if (status == "Sent")
+            {
+                await _notificationHub.Clients.All.SendAsync("AlertBroadcast", new
+                {
+                    id = alert.AlertId,
+                    title = alert.Title,
+                    message = alert.Description,
+                    type = alert.Severity,
+                    targetAudience = alert.TargetAudience,
+                    createdBy = alert.CreatedBy,
+                    sentAt = alert.SentAt
+                });
+            }
+
             return CreatedAtAction(nameof(GetAlert), new { id = alertId }, new
             {
                 id = alert.AlertId,
@@ -216,6 +235,17 @@ namespace FYP_Project_II.Controllers
             alert.UpdatedAt = now;
             await _context.SaveChangesAsync();
             await LogAuditAsync("Broadcast Alert", $"Broadcast alert: {alert.Title} (ID: {id})");
+
+            await _notificationHub.Clients.All.SendAsync("AlertBroadcast", new
+            {
+                id = alert.AlertId,
+                title = alert.Title,
+                message = alert.Description,
+                type = alert.Severity,
+                targetAudience = alert.TargetAudience,
+                createdBy = alert.CreatedBy,
+                sentAt = alert.SentAt
+            });
 
             return Ok(new
             {

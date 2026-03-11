@@ -30,6 +30,9 @@ function mapApiToSOS(r: {
   createdAt: string;
   updatedAt: string;
   solvedAt?: string;
+  completionProofImageUrl?: string | null;
+  completionProofUploadedAt?: string | null;
+  completionProofUploadedBy?: string | null;
 }): SOS {
   return {
     id: r.id,
@@ -42,6 +45,9 @@ function mapApiToSOS(r: {
     urgency: (r.urgency as UrgencyLevel) || 'Medium',
     status: (r.status as SOSStatus) || 'New',
     assignedResponder: r.assignedResponder,
+    completionProofImageUrl: r.completionProofImageUrl ?? null,
+    completionProofUploadedAt: r.completionProofUploadedAt ?? null,
+    completionProofUploadedBy: r.completionProofUploadedBy ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     notes: [],
@@ -56,6 +62,8 @@ export const SOSMonitoring = () => {
   const [selectedSOS, setSelectedSOS] = useState<SOS | null>(null);
   const [selectedNotes, setSelectedNotes] = useState<CaseNote[]>([]);
   const [newNote, setNewNote] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofUploading, setProofUploading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<SOSStatus | 'All'>('All');
   const [dangerZones, setDangerZones] = useState<DangerZoneData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,6 +205,22 @@ export const SOSMonitoring = () => {
       toast.success('Case note added successfully');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add note');
+    }
+  };
+
+  const handleUploadProof = async (sosId: string) => {
+    if (!proofFile) return;
+    try {
+      setProofUploading(true);
+      const updated = await sosApi.uploadCompletionProof(sosId, proofFile);
+      setSOSRequests(prev => prev.map(s => (s.id === sosId ? mapApiToSOS(updated) : s)));
+      if (selectedSOS?.id === sosId) setSelectedSOS(mapApiToSOS(updated));
+      setProofFile(null);
+      toast.success('Completion proof uploaded');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to upload proof');
+    } finally {
+      setProofUploading(false);
     }
   };
 
@@ -429,6 +453,61 @@ export const SOSMonitoring = () => {
                         </Select>
                       </div>
                     </div>
+
+                    <div className="space-y-3">
+                      <Label className="flex items-center gap-2">
+                        Proof of Completion (Image)
+                      </Label>
+
+                      {selectedSOS.completionProofImageUrl ? (
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-500">
+                            Uploaded {selectedSOS.completionProofUploadedAt ? new Date(selectedSOS.completionProofUploadedAt).toLocaleString('en-MY') : ''}{' '}
+                            {selectedSOS.completionProofUploadedBy ? `by ${selectedSOS.completionProofUploadedBy}` : ''}
+                          </div>
+                          <a
+                            href={selectedSOS.completionProofImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm underline"
+                          >
+                            Open full image
+                          </a>
+                          <img
+                            src={selectedSOS.completionProofImageUrl}
+                            alt="Completion proof"
+                            className="w-full max-h-64 object-contain border rounded bg-white"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUploadProof(selectedSOS.id)}
+                            disabled={!proofFile || proofUploading}
+                          >
+                            {proofUploading ? 'Uploading...' : 'Upload Proof Image'}
+                          </Button>
+                          <p className="text-xs text-gray-500">
+                            Upload a JPG/PNG/WEBP (max 5MB) as proof the request was solved.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      className="w-full"
+                      onClick={() => handleUpdateStatus(selectedSOS.id, 'Completed')}
+                      disabled={!selectedSOS.completionProofImageUrl || selectedSOS.status === 'Completed'}
+                    >
+                      Complete Request
+                    </Button>
 
                     {selectedSOS.status === 'New' && (
                       <AlertDialog>

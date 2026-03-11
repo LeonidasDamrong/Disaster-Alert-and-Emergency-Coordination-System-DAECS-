@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -14,6 +14,7 @@ import { CheckCircle, XCircle } from 'lucide-react';
 import { resourceApi, authApi } from '../lib/api';
 import type { Resource, ResourceRequest, Warehouse, Driver, ResourceUsageReport } from '../lib/types';
 import { toast } from 'sonner';
+import { useResourceSignalR } from '../hooks/useResourceSignalR';
 
 interface OverallQuantityItem {
   name: string;
@@ -41,6 +42,21 @@ export const ResourceManagement = () => {
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'System Admin';
   const isResourceManager = user?.role === 'Resource Manager';
+
+  useResourceSignalR(
+    (payload) => {
+      if (!isResourceManager) return;
+      const urgencyLabel = (payload.urgency || 'Medium').toUpperCase();
+      const description = `Request ${payload.id} from ${payload.requestedBy}${payload.destination ? ` • ${payload.destination}` : ''}`;
+      if (String(payload.urgency).toLowerCase() === 'critical') {
+        toast.error(`${urgencyLabel} resource request: ${payload.itemName} (${payload.quantity} ${payload.unit})`, { description });
+      } else {
+        toast.info(`${urgencyLabel} resource request: ${payload.itemName} (${payload.quantity} ${payload.unit})`, { description });
+      }
+      fetchData();
+    },
+    !!user
+  );
 
   const fetchData = async () => {
     try {
@@ -83,6 +99,11 @@ export const ResourceManagement = () => {
   const filteredRequests = filterStatus === 'All'
     ? requests
     : requests.filter((r) => r.status === filterStatus);
+
+  const sortedRequests = useMemo(() => {
+    const extractNum = (id: string) => parseInt(id.replace(/\D/g, ''), 10) || 0;
+    return [...filteredRequests].sort((a, b) => extractNum(b.resourceRequestId) - extractNum(a.resourceRequestId));
+  }, [filteredRequests]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -372,7 +393,7 @@ export const ResourceManagement = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {filteredRequests.length === 0 ? (
+                  {sortedRequests.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">There is no resource request</div>
                   ) : (
                     <Table>
@@ -388,7 +409,7 @@ export const ResourceManagement = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredRequests.map((req) => (
+                        {sortedRequests.map((req) => (
                           <TableRow key={req.resourceRequestId}>
                             <TableCell className="font-mono text-sm">{req.resourceRequestId}</TableCell>
                             <TableCell><div><p className="font-semibold">{req.itemName}</p><p className="text-xs text-gray-600">{req.type}</p></div></TableCell>
@@ -403,6 +424,28 @@ export const ResourceManagement = () => {
                                   <DialogContent>
                                     <DialogHeader><DialogTitle>Process Resource Request</DialogTitle><DialogDescription>{req.resourceRequestId}</DialogDescription></DialogHeader>
                                     <div className="space-y-4">
+                                      {(() => {
+                                        const resource = resources.find(r => r.resourceItemId === req.resourceItemId);
+                                        const availableQty = resource?.quantity ?? 0;
+                                        const unit = resource?.unit ?? req.unit;
+                                        const isSufficient = availableQty >= req.quantity;
+                                        return (
+                                          <div className="p-4 border rounded space-y-2 text-sm">
+                                            <p className="font-semibold">Current Availability</p>
+                                            <div className="flex items-center justify-between">
+                                              <p className="text-gray-600">{resource?.name ?? req.itemName}</p>
+                                              <Badge className={isSufficient ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                {availableQty} {unit} available
+                                              </Badge>
+                                            </div>
+                                            {!isSufficient && (
+                                              <p className="text-red-700">
+                                                Insufficient stock to approve this request (requested {req.quantity} {unit}).
+                                              </p>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                       <div className="p-4 bg-gray-50 rounded space-y-2 text-sm">
                                         <p><span className="text-gray-600">Requested by:</span> {req.requestedBy}</p>
                                         <p><span className="text-gray-600">Item:</span> {req.itemName}</p>
@@ -414,7 +457,12 @@ export const ResourceManagement = () => {
                                         <Textarea value={rejectionNote} onChange={(e) => setRejectionNote(e.target.value)} placeholder="Required for rejection..." rows={3} />
                                       </div>
                                       <div className="flex gap-2">
-                                        <Button onClick={() => handleApproveRequest(req.resourceRequestId)}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
+                                        <Button
+                                          onClick={() => handleApproveRequest(req.resourceRequestId)}
+                                          disabled={(resources.find(r => r.resourceItemId === req.resourceItemId)?.quantity ?? 0) < req.quantity}
+                                        >
+                                          <CheckCircle className="h-4 w-4 mr-2" />Approve
+                                        </Button>
                                         <Button variant="destructive" onClick={() => handleRejectRequest(req.resourceRequestId)} disabled={!rejectionNote.trim()}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
                                       </div>
                                     </div>

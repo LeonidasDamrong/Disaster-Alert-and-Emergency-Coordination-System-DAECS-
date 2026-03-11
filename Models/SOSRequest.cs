@@ -17,6 +17,9 @@ namespace FYP_Project_II.Models
         public string SOSStatus { get; set; }
         public string? AssignedResponderId { get; set; }
         public string? SolvedBy { get; set; }
+        public string? CompletionProofImageUrl { get; set; }
+        public DateTime? CompletionProofUploadedAt { get; set; }
+        public string? CompletionProofUploadedBy { get; set; }
         public DateTime RequestedAt { get; set; }
         public DateTime? SolvedAt { get; set; }
         public DateTime CreatedAt { get; set; }

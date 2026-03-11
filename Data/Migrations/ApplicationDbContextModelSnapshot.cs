@@ -524,6 +524,15 @@ namespace FYP_Project_II.Data.Migrations
                     b.Property<string>("AssignedResponderId")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CompletionProofImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("CompletionProofUploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CompletionProofUploadedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 

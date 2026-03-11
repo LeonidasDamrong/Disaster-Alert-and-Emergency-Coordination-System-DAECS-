@@ -27,6 +27,9 @@ export interface SOS {
   urgency: UrgencyLevel;
   status: SOSStatus;
   assignedResponder?: string;
+  completionProofImageUrl?: string | null;
+  completionProofUploadedAt?: string | null;
+  completionProofUploadedBy?: string | null;
   createdAt: string;
   updatedAt: string;
   notes: CaseNote[];

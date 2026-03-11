@@ -460,10 +460,51 @@ export const sosApi = {
             createdAt: string;
             updatedAt: string;
             solvedAt?: string;
+            completionProofImageUrl?: string | null;
+            completionProofUploadedAt?: string | null;
+            completionProofUploadedBy?: string | null;
         }>(`/api/sos/${encodeURIComponent(id)}`, data),
 
     addNote: (id: string, note: string) =>
         apiClient.post<{ id: string; author: string; timestamp: string; note: string }>(`/api/sos/${encodeURIComponent(id)}/notes`, { note }),
+
+    uploadCompletionProof: async (id: string, file: File) => {
+        const token = localStorage.getItem('authToken');
+        const form = new FormData();
+        form.append('file', file);
+
+        const res = await fetch(`${API_BASE_URL}/api/sos/${encodeURIComponent(id)}/completion-proof`, {
+            method: 'POST',
+            headers: {
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
+            body: form,
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => null);
+            const message = error?.message ?? `Upload failed (${res.status})`;
+            throw new Error(message);
+        }
+        return await res.json() as {
+            id: string;
+            victimName: string;
+            victimPhone: string;
+            location: string;
+            latitude: number;
+            longitude: number;
+            description: string;
+            urgency: string;
+            status: string;
+            assignedResponder?: string;
+            createdAt: string;
+            updatedAt: string;
+            solvedAt?: string;
+            completionProofImageUrl?: string | null;
+            completionProofUploadedAt?: string | null;
+            completionProofUploadedBy?: string | null;
+        };
+    },
 
     getDangerZones: () =>
         apiClient.get<Array<{
