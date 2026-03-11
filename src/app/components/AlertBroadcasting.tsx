@@ -12,8 +12,13 @@ import { AlertTriangle, Send, Calendar, XCircle, Loader2 } from 'lucide-react';
 import { alertApi } from '../lib/api';
 import type { Alert as AlertType, AlertType as SeverityType, AlertStatus } from '../lib/types';
 import { toast } from 'sonner';
+import { useIsMobile } from './ui/use-mobile';
+
+const typeShort: Record<string, string> = { Emergency: 'Emerg', Warning: 'Warn', Information: 'Info', 'All Clear': 'Clear' };
+const statusShort: Record<string, string> = { Sent: 'Sent', Scheduled: 'Sched', Canceled: 'Canc' };
 
 export const AlertBroadcasting = () => {
+  const isMobile = useIsMobile();
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -133,12 +138,15 @@ export const AlertBroadcasting = () => {
     }
   };
 
+  const typeLabel = (type: string) => (isMobile && typeShort[type]) ? typeShort[type] : type;
+  const statusLabel = (status: string) => (isMobile && statusShort[status]) ? statusShort[status] : status;
+
   return (
-    <div className="space-y-6 min-w-0 max-w-full">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Alert Broadcasting</h2>
-          <p className="text-gray-600">Create and manage emergency alerts</p>
+    <div className="space-y-6 min-w-0 max-w-full overflow-hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-3xl font-bold truncate">Alert Broadcasting</h2>
+          <p className="text-sm text-gray-600">Create and manage emergency alerts</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -254,9 +262,9 @@ export const AlertBroadcasting = () => {
       </div>
 
       <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>Alert History</CardTitle>
-          <CardDescription>Sent, scheduled, and canceled alerts from database</CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">Alert History</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Sent, scheduled, and canceled alerts from database</CardDescription>
         </CardHeader>
         <CardContent className="p-0 sm:p-6">
           {loading ? (
@@ -264,23 +272,23 @@ export const AlertBroadcasting = () => {
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
-            <div className="min-w-0 overflow-hidden w-full">
-              <Table className="table-fixed w-full">
+            <div className="overflow-x-auto w-full -mx-px sm:mx-0">
+              <Table className="w-full min-w-[640px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-20">ID</TableHead>
-                    <TableHead className="min-w-0 max-w-[140px]">Title</TableHead>
-                    <TableHead className="w-24">Type</TableHead>
-                    <TableHead className="min-w-0 max-w-[120px]">Audience</TableHead>
-                    <TableHead className="w-24">Status</TableHead>
-                    <TableHead className="w-40">Timestamp</TableHead>
-                    <TableHead className="w-44">Actions</TableHead>
+                    <TableHead className="w-20 whitespace-nowrap">ID</TableHead>
+                    <TableHead className="min-w-[100px] max-w-[140px]">Title</TableHead>
+                    <TableHead className="w-20 sm:w-24 whitespace-nowrap">Type</TableHead>
+                    <TableHead className="min-w-0 max-w-[100px] sm:max-w-[120px]">Audience</TableHead>
+                    <TableHead className="w-20 sm:w-24 whitespace-nowrap">Status</TableHead>
+                    <TableHead className="w-36 sm:w-40 whitespace-nowrap">Timestamp</TableHead>
+                    <TableHead className="w-32 sm:w-44 whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {alerts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500 text-sm">
                         No alerts found. Create your first alert to get started.
                       </TableCell>
                     </TableRow>
@@ -288,26 +296,26 @@ export const AlertBroadcasting = () => {
                     alerts.map((alert) => (
                       <TableRow key={alert.id}>
                         <TableCell className="font-mono text-xs truncate">{alert.id}</TableCell>
-                        <TableCell className="font-semibold truncate max-w-[140px]" title={alert.title}>{alert.title}</TableCell>
+                        <TableCell className="font-semibold text-sm truncate max-w-[140px]" title={alert.title}>{alert.title}</TableCell>
                         <TableCell>
-                          <Badge className={`${getAlertTypeColor(alert.type)} border text-xs`}>
-                            {alert.type}
+                          <Badge className={`${getAlertTypeColor(alert.type)} border text-xs whitespace-nowrap`} title={alert.type}>
+                            {typeLabel(alert.type)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="truncate max-w-[120px]" title={alert.targetAudience}>{alert.targetAudience}</TableCell>
+                        <TableCell className="text-xs truncate max-w-[120px]" title={alert.targetAudience}>{alert.targetAudience}</TableCell>
                         <TableCell>
                           <Badge variant={
                             alert.status === 'Sent' ? 'default' :
                               alert.status === 'Scheduled' ? 'secondary' :
                                 'outline'
-                          } className="text-xs">
-                            {alert.status}
+                          } className="text-xs whitespace-nowrap" title={alert.status}>
+                            {statusLabel(alert.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs whitespace-nowrap">
-                          {alert.sentAt && `Sent: ${new Date(alert.sentAt).toLocaleString('en-MY')}`}
-                          {alert.scheduledFor && !alert.sentAt && `Sched: ${new Date(alert.scheduledFor).toLocaleString('en-MY')}`}
-                          {!alert.sentAt && !alert.scheduledFor && `Created: ${new Date(alert.createdAt).toLocaleString('en-MY')}`}
+                          {alert.sentAt && (isMobile ? `Sent: ${new Date(alert.sentAt).toLocaleDateString('en-MY')} ${new Date(alert.sentAt).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })}` : `Sent: ${new Date(alert.sentAt).toLocaleString('en-MY')}`)}
+                          {alert.scheduledFor && !alert.sentAt && (isMobile ? `Sched: ${new Date(alert.scheduledFor).toLocaleDateString('en-MY')}` : `Sched: ${new Date(alert.scheduledFor).toLocaleString('en-MY')}`)}
+                          {!alert.sentAt && !alert.scheduledFor && (isMobile ? `Created: ${new Date(alert.createdAt).toLocaleDateString('en-MY')}` : `Created: ${new Date(alert.createdAt).toLocaleString('en-MY')}`)}
                         </TableCell>
                         <TableCell>
                           {alert.status === 'Scheduled' && (
@@ -328,7 +336,7 @@ export const AlertBroadcasting = () => {
                                 onClick={() => handleCancelAlert(alert.id)}
                               >
                                 <XCircle className="h-3 w-3" />
-                                Cancel
+                                <span className="hidden sm:inline">Cancel</span>
                               </Button>
                             </div>
                           )}

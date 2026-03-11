@@ -14,9 +14,13 @@ import { User, UserRole, AuditLog, Announcement, SystemSettings } from '../lib/t
 import { toast } from 'sonner';
 import { authApi, auditLogApi, systemSettingsApi, announcementApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useIsMobile } from './ui/use-mobile';
+
+const getShortName = (s: string) => (s && s.split(' - ')[0]) || s || '';
 
 export const AdminManagement = () => {
   const { user: currentUser } = useAuth();
+  const isMobile = useIsMobile();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -277,32 +281,36 @@ export const AdminManagement = () => {
     }
   };
 
+  const systemNameDisplay = isMobile && !isEditingSettings
+    ? getShortName(systemSettings.systemName)
+    : (isEditingSettings ? tempSettings.systemName : systemSettings.systemName);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Admin Management</h2>
-          <p className="text-gray-600">System administration and configuration</p>
+    <div className="space-y-6 min-w-0 overflow-hidden">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-3xl font-bold truncate">{isMobile ? 'Admin' : 'Admin Management'}</h2>
+          <p className="text-sm sm:text-base text-gray-600 truncate">{isMobile ? 'Admin & config' : 'System administration and configuration'}</p>
         </div>
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users" className="gap-2">
-            <Users className="h-4 w-4" />
-            User Management
+        <TabsList className="flex w-full overflow-x-auto flex-nowrap p-1 h-auto gap-1 sm:inline-flex sm:w-auto">
+          <TabsTrigger value="users" className="gap-1.5 sm:gap-2 shrink-0 text-xs sm:text-sm">
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            {isMobile ? 'Users' : 'User Management'}
           </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-2">
-            <Clock className="h-4 w-4" />
+          <TabsTrigger value="audit" className="gap-1.5 sm:gap-2 shrink-0 text-xs sm:text-sm">
+            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Audit Logs
           </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-2">
-            <Settings className="h-4 w-4" />
-            System Settings
+          <TabsTrigger value="settings" className="gap-1.5 sm:gap-2 shrink-0 text-xs sm:text-sm">
+            <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            {isMobile ? 'Settings' : 'System Settings'}
           </TabsTrigger>
-          <TabsTrigger value="announcements" className="gap-2">
-            <Bell className="h-4 w-4" />
-            Announcements
+          <TabsTrigger value="announcements" className="gap-1.5 sm:gap-2 shrink-0 text-xs sm:text-sm">
+            <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            {isMobile ? 'Announce' : 'Announcements'}
           </TabsTrigger>
         </TabsList>
 
@@ -657,41 +665,42 @@ export const AdminManagement = () => {
         {/* System Settings Tab */}
         <TabsContent value="settings">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>System Settings</CardTitle>
-                  <CardDescription>Configure system parameters</CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <CardTitle className="text-lg sm:text-xl">{isMobile ? 'Settings' : 'System Settings'}</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">{isMobile ? 'Configure parameters' : 'Configure system parameters'}</CardDescription>
                 </div>
                 {currentUser?.role === 'System Admin' && !isEditingSettings && (
-                  <Button onClick={handleEditSettings} size="sm" variant="outline" className="gap-2">
+                  <Button onClick={handleEditSettings} size="sm" variant="outline" className="gap-2 shrink-0">
                     <Pencil className="h-4 w-4" />
-                    Edit Settings
+                    {isMobile ? 'Edit' : 'Edit Settings'}
                   </Button>
                 )}
                 {isEditingSettings && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <Button onClick={handleCancelSettings} size="sm" variant="outline" className="gap-2">
                       <X className="h-4 w-4" />
                       Cancel
                     </Button>
                     <Button onClick={handleSaveSettings} size="sm" className="gap-2 bg-green-600 hover:bg-green-700">
                       <Save className="h-4 w-4" />
-                      Save Changes
+                      {isMobile ? 'Save' : 'Save Changes'}
                     </Button>
                   </div>
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent className="space-y-4 p-4 sm:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>System Name</Label>
                   <Input
-                    value={isEditingSettings ? tempSettings.systemName : systemSettings.systemName}
+                    value={systemNameDisplay}
                     readOnly={!isEditingSettings}
                     onChange={(e) => setTempSettings({ ...tempSettings, systemName: e.target.value })}
                     className={!isEditingSettings ? 'bg-gray-50' : ''}
+                    title={systemSettings.systemName}
                   />
                 </div>
                 <div className="space-y-2">

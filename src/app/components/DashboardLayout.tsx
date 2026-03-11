@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
@@ -11,7 +11,11 @@ import {
   Package,
   Users,
   LogOut,
-  Bell
+  Bell,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Menu,
+  X,
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { systemSettingsApi } from '../lib/api';
@@ -22,6 +26,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useSOSSignalR } from '../hooks/useSOSSignalR';
 import { useResourceSignalR } from '../hooks/useResourceSignalR';
 import { useNotificationSignalR } from '../hooks/useNotificationSignalR';
+import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -163,23 +168,77 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sidebarWidth = sidebarCollapsed ? 'w-16' : 'w-64';
+  const mainMarginClass = sidebarCollapsed ? 'md:ml-16' : 'md:ml-64';
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  const systemShortName = useMemo(() => {
+    if (!settings?.systemName) return '';
+    const short = settings.systemName.split(' - ')[0];
+    return short || settings.systemName;
+  }, [settings.systemName]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header - compact on small windows */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-red-600 p-2 rounded">
-                <ShieldAlert className="h-6 w-6 text-white" />
+        <div className="px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
+              {/* Mobile menu trigger - only on small screens */}
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="shrink-0 md:hidden">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 p-0 flex flex-col [&>button]:hidden">
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-red-600 p-2 rounded">
+                        <ShieldAlert className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="font-semibold text-sm truncate">Menu</span>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={closeMobileMenu} aria-label="Close menu">
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+                    {filteredNavItems.map((item) => (
+                      <Link key={item.path} to={item.path} onClick={closeMobileMenu}>
+                        <Button
+                          variant={isActive(item.path) ? 'default' : 'ghost'}
+                          className={`w-full justify-start gap-3 ${isActive(item.path)
+                            ? 'bg-red-600 hover:bg-red-700 text-white'
+                            : 'hover:bg-gray-100'
+                            }`}
+                        >
+                          <item.icon className="h-5 w-5 shrink-0" />
+                          {item.label}
+                        </Button>
+                      </Link>
+                    ))}
+                  </nav>
+                </SheetContent>
+              </Sheet>
+              <div className="bg-red-600 p-1.5 md:p-2 rounded shrink-0">
+                <ShieldAlert className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">{settings.systemName}</h1>
-                <p className="text-xs text-gray-500">{settings.organizationName}</p>
+              <div className="min-w-0">
+                <h1 className="text-base md:text-xl font-bold text-gray-900 truncate">
+                  <span className="md:hidden">{systemShortName}</span>
+                  <span className="hidden md:inline">{settings.systemName}</span>
+                </h1>
+                <p className="text-[11px] md:text-xs text-gray-500 truncate hidden sm:block">{settings.organizationName}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 sm:gap-4 shrink-0">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
@@ -248,19 +307,19 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 </PopoverContent>
               </Popover>
 
-              <div className="flex items-center gap-3 border-l pl-4">
-                <div className="text-right">
-                  <p className="text-sm font-semibold">{user?.name}</p>
+              <div className="flex items-center gap-2 md:gap-3 border-l border-gray-200 pl-2 md:pl-4">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold truncate max-w-[120px]">{user?.name}</p>
                   <Badge variant="outline" className="text-xs">{user?.role}</Badge>
                 </div>
                 <Button
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 h-8 md:h-9"
                 >
                   <LogOut className="h-4 w-4" />
-                  Logout
+                  <span className="hidden sm:inline">Logout</span>
                 </Button>
               </div>
             </div>
@@ -269,11 +328,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       </header>
 
       <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 fixed left-0 top-[73px] h-[calc(100vh-73px)] overflow-y-auto z-40">
-          <nav className="p-4 space-y-1">
+        {/* Collapsible Sidebar - desktop only; on small windows use Sheet menu */}
+        <aside
+          className={`hidden md:flex ${sidebarWidth} bg-white border-r border-gray-200 fixed left-0 top-[65px] h-[calc(100vh-65px)] flex-col transition-[width] duration-200 ease-in-out z-40`}
+        >
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden">
             {filteredNavItems.map((item) => (
-              <Link key={item.path} to={item.path}>
+              <Link key={item.path} to={item.path} title={sidebarCollapsed ? item.label : undefined}>
                 <Button
                   variant={isActive(item.path) ? 'default' : 'ghost'}
                   className={`w-full justify-start gap-3 ${isActive(item.path)
@@ -281,16 +342,35 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                     : 'hover:bg-gray-100'
                     }`}
                 >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  <span
+                    className={`inline-block overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-in-out ${sidebarCollapsed ? 'max-w-0 opacity-0 min-w-0' : 'max-w-[10rem] opacity-100'}`}
+                  >
+                    {item.label}
+                  </span>
                 </Button>
               </Link>
             ))}
           </nav>
+          <div className="p-2 border-t border-gray-200">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-full"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="h-5 w-5" />
+              ) : (
+                <PanelLeftClose className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 min-w-0 p-6 ml-64 flex flex-col min-h-0">
+        {/* Main Content - full width on mobile, sidebar margin on desktop */}
+        <main className={`flex-1 min-w-0 p-4 sm:p-5 md:p-6 ml-0 ${mainMarginClass} flex flex-col min-h-0 transition-[margin] duration-200 ease-in-out`}>
           {children}
         </main>
       </div>
