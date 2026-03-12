@@ -204,6 +204,8 @@ namespace FYP_Project_II.Controllers
 
             existing.ShelterName = shelter.ShelterName;
             existing.Address = shelter.Address;
+            existing.Latitude = shelter.Latitude;
+            existing.Longitude = shelter.Longitude;
             existing.TotalCapacity = shelter.TotalCapacity;
             existing.Status = shelter.Status;
             existing.ManagedBy = shelter.ManagedBy;

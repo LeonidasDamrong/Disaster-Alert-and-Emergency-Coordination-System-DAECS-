@@ -13,9 +13,9 @@ namespace FYP_Project_II.Data.Seeders
             {
                 var shelters = new[]
                 {
-                    new Shelter { ShelterId = "SHEL001", ShelterName = "Dewan Serbaguna Ampang", Address = "Ampang, Selangor", TotalCapacity = 500, AvailableCapacity = 495, Status = "Open", ManagedBy = "shelter001", RegisteredAt = baseDate, LastModifiedAt = baseDate },
-                    new Shelter { ShelterId = "SHEL002", ShelterName = "SK Bukit Indah", Address = "Ampang, Selangor", TotalCapacity = 300, AvailableCapacity = 298, Status = "Open", ManagedBy = "shelter002", RegisteredAt = baseDate, LastModifiedAt = baseDate },
-                    new Shelter { ShelterId = "SHEL003", ShelterName = "Masjid Jamek KL", Address = "Kuala Lumpur", TotalCapacity = 200, AvailableCapacity = 200, Status = "Closed", ManagedBy = "shelter003", RegisteredAt = baseDate, LastModifiedAt = baseDate }
+                    new Shelter { ShelterId = "SHEL001", ShelterName = "Dewan Serbaguna Ampang", Address = "Ampang, Selangor", Latitude = 3.1528, Longitude = 101.7611, TotalCapacity = 500, AvailableCapacity = 495, Status = "Open", ManagedBy = "shelter001", RegisteredAt = baseDate, LastModifiedAt = baseDate },
+                    new Shelter { ShelterId = "SHEL002", ShelterName = "SK Bukit Indah", Address = "Ampang, Selangor", Latitude = 3.1456, Longitude = 101.7479, TotalCapacity = 300, AvailableCapacity = 298, Status = "Open", ManagedBy = "shelter002", RegisteredAt = baseDate, LastModifiedAt = baseDate },
+                    new Shelter { ShelterId = "SHEL003", ShelterName = "Masjid Jamek KL", Address = "Kuala Lumpur", Latitude = 3.1495, Longitude = 101.6967, TotalCapacity = 200, AvailableCapacity = 200, Status = "Closed", ManagedBy = "shelter003", RegisteredAt = baseDate, LastModifiedAt = baseDate }
                 };
                 await dbContext.Shelters.AddRangeAsync(shelters);
                 Console.WriteLine("Seeded Shelters");
