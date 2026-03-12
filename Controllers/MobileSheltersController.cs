@@ -36,7 +36,11 @@ namespace FYP_Project_II.Controllers
                     Longitude = s.Longitude,
                     Capacity = s.TotalCapacity,
                     CurrentOccupancy = s.TotalCapacity - s.AvailableCapacity,
-                    Status = s.Status
+                    Status = s.Status,
+                    ContactNumber = _context.Users
+                        .Where(u => u.UserName == s.ManagedBy)
+                        .Select(u => u.PhoneNumber)
+                        .FirstOrDefault() ?? string.Empty
                 })
                 .ToListAsync();
 

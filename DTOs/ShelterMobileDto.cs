@@ -10,6 +10,7 @@ namespace FYP_Project_II.DTOs
         public int Capacity { get; set; }
         public int CurrentOccupancy { get; set; }
         public string Status { get; set; } = "Open";
+        public string ContactNumber { get; set; } = string.Empty;
     }
 }
 
