@@ -88,12 +88,21 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Configure CORS for React development
+// Configure CORS for React, Flutter web, and other localhost clients (any port)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://localhost:5173")
+        policy.SetIsOriginAllowed(origin =>
+              {
+                  if (string.IsNullOrEmpty(origin)) return false;
+                  try
+                  {
+                      var uri = new Uri(origin);
+                      return uri.Host == "localhost" || uri.Host == "127.0.0.1";
+                  }
+                  catch { return false; }
+              })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
