@@ -4,17 +4,17 @@ namespace FYP_Project_II.Models
 {
     public class SOSRequest
     {
-        public string SOSRequestId { get; set; }
-        public string UserId { get; set; } // Mobile user identifier
-        public string VictimName { get; set; }
-        public string VictimContact { get; set; }
-        public string Location { get; set; }
+        public string SOSRequestId { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty; // Mobile user identifier
+        public string VictimName { get; set; } = string.Empty;
+        public string VictimContact { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
         public decimal Latitude { get; set; }
         public decimal Longitude { get; set; }
         public string? Description { get; set; }
-        public string UrgencyLevel { get; set; }
+        public string UrgencyLevel { get; set; } = string.Empty;
         [Column("Status")]
-        public string SOSStatus { get; set; }
+        public string SOSStatus { get; set; } = string.Empty;
         public string? AssignedResponderId { get; set; }
         public string? SolvedBy { get; set; }
         public string? CompletionProofImageUrl { get; set; }

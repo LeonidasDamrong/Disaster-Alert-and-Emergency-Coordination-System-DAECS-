@@ -6,6 +6,10 @@
 # Environment variables (contains API keys, secrets)
 .env
 
+# Firebase service account key (never commit)
+*firebase*adminsdk*.json
+daecsapp2026-firebase-adminsdk-fbsvc-2d08ba2516.json
+
 # User-specific files
 *.rsuser
 *.suo

@@ -1,6 +1,7 @@
 using FYP_Project_II.Data;
 using FYP_Project_II.Hubs;
 using FYP_Project_II.Models;
+using FYP_Project_II.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -19,12 +20,14 @@ namespace FYP_Project_II.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IHubContext<NotificationHub> _notificationHub;
+        private readonly IFcmSender _fcmSender;
 
-        public AlertsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IHubContext<NotificationHub> notificationHub)
+        public AlertsController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IHubContext<NotificationHub> notificationHub, IFcmSender fcmSender)
         {
             _context = context;
             _userManager = userManager;
             _notificationHub = notificationHub;
+            _fcmSender = fcmSender;
         }
 
         private static string? ToUtcIso(DateTime? dt) =>
@@ -151,6 +154,7 @@ namespace FYP_Project_II.Controllers
                     createdBy = alert.CreatedBy,
                     sentAt = alert.SentAt
                 });
+                await _fcmSender.SendAlertPushAsync(alert.AlertId, alert.Title, alert.Description);
             }
 
             return CreatedAtAction(nameof(GetAlert), new { id = alertId }, new
@@ -246,6 +250,7 @@ namespace FYP_Project_II.Controllers
                 createdBy = alert.CreatedBy,
                 sentAt = alert.SentAt
             });
+            await _fcmSender.SendAlertPushAsync(alert.AlertId, alert.Title, alert.Description);
 
             return Ok(new
             {

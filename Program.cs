@@ -113,6 +113,10 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 builder.Services.AddHostedService<AlertBroadcastBackgroundService>();
 
+// FCM push notifications for alerts (topic "alerts"). Configure Firebase:ProjectId and ServiceAccountJsonPath or ServiceAccountJson.
+builder.Services.Configure<FYP_Project_II.Services.FirebaseOptions>(builder.Configuration.GetSection(FYP_Project_II.Services.FirebaseOptions.SectionName));
+builder.Services.AddHttpClient<FYP_Project_II.Services.IFcmSender, FYP_Project_II.Services.FcmService>();
+
 // Azure Blob Storage (for SOS completion proof images)
 var blobConnectionString = builder.Configuration.GetConnectionString("AzureBlobStorage");
 if (!string.IsNullOrWhiteSpace(blobConnectionString))
