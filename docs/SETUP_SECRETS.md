@@ -10,10 +10,10 @@ From the project directory (the one containing the `.csproj`), run:
 dotnet user-secrets init
 
 # Database
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=tcp:fyp-server-leonidas.database.windows.net,1433;Initial Catalog=FYP-Database;User ID=fyp_admin;MultipleActiveResultSets=True;Encrypt=True;"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "YOUR_SQL_CONNECTION_STRING"
 
 # Azure Blob Storage (optional if you don't use SOS proof uploads locally)
-dotnet user-secrets set "ConnectionStrings:AzureBlobStorage" "DefaultEndpointsProtocol=https;AccountName=fypstorageleon;AccountKey=YnQoxUqJ0UwqhNNdPaGYU/7mzUH+mE8T4oTfFZ6yCI83Hpger9T/fszy/pNIctF/BnhML34KB9aV+AStb0NvYQ==;EndpointSuffix=core.windows.net"
+dotnet user-secrets set "ConnectionStrings:AzureBlobStorage" "YOUR_AZURE_STORAGE_CONNECTION_STRING"
 
 # Azure SignalR (optional; leave unset to use local SignalR)
 dotnet user-secrets set "ConnectionStrings:AzureSignalR" "YOUR_AZURE_SIGNALR_CONNECTION_STRING"
@@ -26,8 +26,8 @@ dotnet user-secrets set "Jwt:ExpiryInHours" "24"
 
 # Firebase (FCM) - choose ONE approach:
 # Option A: Provide a path to a local JSON key file (file must NOT be committed)
-dotnet user-secrets set "Firebase:ProjectId" "daecsapp2026"
-dotnet user-secrets set "Firebase:ServiceAccountJsonPath" "daecsapp2026-firebase-adminsdk-fbsvc-2d08ba2516.json"
+dotnet user-secrets set "Firebase:ProjectId" "YOUR_FIREBASE_PROJECT_ID"
+dotnet user-secrets set "Firebase:ServiceAccountJsonPath" "PATH_TO_YOUR_SERVICE_ACCOUNT_JSON"
 
 # Option B: Inline JSON (also must NOT be committed)
 # dotnet user-secrets set "Firebase:ServiceAccountJson" "{...service account json...}"
