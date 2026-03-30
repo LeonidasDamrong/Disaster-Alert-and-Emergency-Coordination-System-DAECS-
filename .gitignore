@@ -5,6 +5,24 @@
 
 # Environment variables (contains API keys, secrets)
 .env
+.env.*
+!.env.example
+
+# App settings overrides (local-only secrets)
+appsettings.*.local.json
+appsettings.Local.json
+appsettings.*.Secrets.json
+appsettings.Secrets.json
+
+# Common secret/certificate/key files
+*.pfx
+*.pem
+*.key
+*.cer
+*.p12
+
+# Local notes that may contain secrets (keep sample docs instead)
+docs/General Note.local.txt
 
 # Firebase service account key (never commit)
 *firebase*adminsdk*.json

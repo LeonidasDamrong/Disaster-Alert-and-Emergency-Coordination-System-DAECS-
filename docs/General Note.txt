@@ -1,8 +1,12 @@
 ["eastasia","indonesiacentral","japanwest","centralindia","malaysiawest"]
 
-Database Credentials
-Username: fyp_admin
-Pass: Daecs@0828
+This file is intentionally sanitized for a public repo.
 
-Connection String:
-Server=tcp:fyp-server-leonidas.database.windows.net,1433;Initial Catalog=FYP-Database;Persist Security Info=False;User ID=fyp_admin;Password=Daecs@0828;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+DO NOT store real credentials, keys, tokens, or connection strings in tracked files.
+
+Use one of:
+- ASP.NET User Secrets (recommended for local development)
+- Environment variables / hosting secret store (recommended for production)
+
+Placeholders (examples only):
+- DB connection string: Server=tcp:YOUR_SERVER.database.windows.net,1433;Initial Catalog=YOUR_DATABASE;User ID=YOUR_DB_USER;Password=YOUR_DB_PASSWORD;Encrypt=True;
