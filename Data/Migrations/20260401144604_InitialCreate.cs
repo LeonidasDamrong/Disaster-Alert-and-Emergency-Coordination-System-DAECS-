@@ -270,6 +270,8 @@ namespace FYP_Project_II.Data.Migrations
                     ShelterId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     ShelterName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Latitude = table.Column<double>(type: "float", nullable: false),
+                    Longitude = table.Column<double>(type: "float", nullable: false),
                     TotalCapacity = table.Column<int>(type: "int", nullable: false),
                     AvailableCapacity = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),

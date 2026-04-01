@@ -578,30 +578,62 @@ export const SOSMonitoring = () => {
                 )}
 
                 {isViewOnly && (
-                  <div className="space-y-3">
-                    <Label className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Case Notes
-                    </Label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3 scrollbar-dialog">
-                      {displayNotes.length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-4">No notes yet</p>
-                      ) : (
-                        displayNotes.map((note) => (
-                          <div key={note.id} className="p-3 bg-gray-50 rounded border">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-semibold">{note.author}</span>
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {new Date(note.timestamp).toLocaleString('en-MY')}
-                              </span>
-                            </div>
-                            <p className="text-sm">{note.note}</p>
+                  <>
+                    <div className="space-y-3">
+                      <Label className="flex items-center gap-2">
+                        Proof of Completion (Image)
+                      </Label>
+
+                      {selectedSOS.completionProofImageUrl ? (
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-500">
+                            Uploaded {selectedSOS.completionProofUploadedAt ? new Date(selectedSOS.completionProofUploadedAt).toLocaleString('en-MY') : ''}{' '}
+                            {selectedSOS.completionProofUploadedBy ? `by ${selectedSOS.completionProofUploadedBy}` : ''}
                           </div>
-                        ))
+                          <a
+                            href={selectedSOS.completionProofImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm underline"
+                          >
+                            Open full image
+                          </a>
+                          <img
+                            src={selectedSOS.completionProofImageUrl}
+                            alt="Completion proof"
+                            className="w-full max-h-64 object-contain border rounded bg-white"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No proof image uploaded.</p>
                       )}
                     </div>
-                  </div>
+
+                    <div className="space-y-3">
+                      <Label className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Case Notes
+                      </Label>
+                      <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-3 scrollbar-dialog">
+                        {displayNotes.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No notes yet</p>
+                        ) : (
+                          displayNotes.map((note) => (
+                            <div key={note.id} className="p-3 bg-gray-50 rounded border">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-semibold">{note.author}</span>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {new Date(note.timestamp).toLocaleString('en-MY')}
+                                </span>
+                              </div>
+                              <p className="text-sm">{note.note}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
                 </div>
               </div>

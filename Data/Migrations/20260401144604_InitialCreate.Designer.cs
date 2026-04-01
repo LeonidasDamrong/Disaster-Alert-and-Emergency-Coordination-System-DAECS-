@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FYP_Project_II.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260312092016_InitialCreate")]
+    [Migration("20260401144604_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -604,6 +604,12 @@ namespace FYP_Project_II.Data.Migrations
 
                     b.Property<DateTime>("LastModifiedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("float");
 
                     b.Property<string>("ManagedBy")
                         .HasColumnType("nvarchar(max)");

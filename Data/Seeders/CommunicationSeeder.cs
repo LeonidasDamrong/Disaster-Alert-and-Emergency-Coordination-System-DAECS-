@@ -11,11 +11,39 @@ namespace FYP_Project_II.Data.Seeders
             // Seed SOS Requests
             if (!dbContext.SOSRequests.Any())
             {
+                var proofSvg = "data:image/svg+xml;utf8," +
+                               "<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='700'>" +
+                               "<rect width='100%25' height='100%25' fill='%23f3f4f6'/>" +
+                               "<text x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' " +
+                               "font-family='Arial' font-size='44' fill='%23111827'>SOS Completion Proof</text>" +
+                               "<text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' " +
+                               "font-family='Arial' font-size='28' fill='%234b5563'>Dummy seeded image (SOS003)</text>" +
+                               "</svg>";
+
                 var sosRequests = new[]
                 {
                     new SOSRequest { SOSRequestId = "SOS001", UserId = "user001", VictimName = "Lee Wei Ming", VictimContact = "+60198765432", Location = "Taman Sri Muda, Shah Alam", Latitude = 3.0567m, Longitude = 101.5335m, UrgencyLevel = "Critical", SOSStatus = "New", RequestedAt = baseDate.AddHours(1), CreatedAt = baseDate.AddHours(1), UpdatedAt = baseDate.AddHours(1) },
                     new SOSRequest { SOSRequestId = "SOS002", UserId = "user002", VictimName = "Fatimah binti Hassan", VictimContact = "+60187654321", Location = "Kampung Baru, KL", Latitude = 3.1642m, Longitude = 101.7041m, UrgencyLevel = "High", SOSStatus = "In Progress", AssignedResponderId = "responder001", RequestedAt = baseDate.AddHours(2), CreatedAt = baseDate.AddHours(2), UpdatedAt = baseDate.AddHours(3) },
-                    new SOSRequest { SOSRequestId = "SOS003", UserId = "user003", VictimName = "Wong Ah Kau", VictimContact = "+60176543210", Location = "Klang, Selangor", Latitude = 3.0357m, Longitude = 101.4414m, UrgencyLevel = "Medium", SOSStatus = "Completed", SolvedBy = "responder001", RequestedAt = baseDate.AddHours(-5), SolvedAt = baseDate.AddHours(-1), CreatedAt = baseDate.AddHours(-5), UpdatedAt = baseDate.AddHours(-1) }
+                    new SOSRequest
+                    {
+                        SOSRequestId = "SOS003",
+                        UserId = "user003",
+                        VictimName = "Wong Ah Kau",
+                        VictimContact = "+60176543210",
+                        Location = "Klang, Selangor",
+                        Latitude = 3.0357m,
+                        Longitude = 101.4414m,
+                        UrgencyLevel = "Medium",
+                        SOSStatus = "Completed",
+                        SolvedBy = "responder001",
+                        CompletionProofImageUrl = proofSvg,
+                        CompletionProofUploadedAt = baseDate.AddHours(-1),
+                        CompletionProofUploadedBy = "responder001",
+                        RequestedAt = baseDate.AddHours(-5),
+                        SolvedAt = baseDate.AddHours(-1),
+                        CreatedAt = baseDate.AddHours(-5),
+                        UpdatedAt = baseDate.AddHours(-1)
+                    }
                 };
                 await dbContext.SOSRequests.AddRangeAsync(sosRequests);
                 Console.WriteLine("Seeded SOS Requests");
