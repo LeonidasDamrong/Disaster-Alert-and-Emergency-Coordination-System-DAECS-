@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -13,6 +13,7 @@ import { alertApi, victimReportApi } from '../lib/api';
 import type { Alert as AlertType, AlertType as SeverityType, AlertStatus, VictimReport } from '../lib/types';
 import { toast } from 'sonner';
 import { useIsMobile } from './ui/use-mobile';
+import { useAuth } from '../context/AuthContext';
 
 const typeShort: Record<string, string> = { Emergency: 'Emerg', Warning: 'Warn', Information: 'Info', 'All Clear': 'Clear' };
 const statusShort: Record<string, string> = { Sent: 'Sent', Scheduled: 'Sched', Canceled: 'Canc' };
@@ -34,6 +35,11 @@ function buildDefaultAlertMessage(r: VictimReport): string {
 
 export const AlertBroadcasting = () => {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const userRoleRef = useRef(user?.role);
+  userRoleRef.current = user?.role;
+  const canModerateVictimReports = user?.role === 'Admin' || user?.role === 'System Admin';
+
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -110,13 +116,22 @@ export const AlertBroadcasting = () => {
   };
 
   useEffect(() => {
-    fetchAlerts();
-    fetchPendingReports();
-    const interval = setInterval(() => {
-      fetchAlerts();
-      fetchPendingReports();
+    void fetchAlerts();
+    const mod = user?.role === 'Admin' || user?.role === 'System Admin';
+    if (mod) void fetchPendingReports();
+    else {
+      setLoadingReports(false);
+      setPendingReports([]);
+    }
+  }, [user?.role]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      void fetchAlerts();
+      const r = userRoleRef.current;
+      if (r === 'Admin' || r === 'System Admin') void fetchPendingReports();
     }, 30000);
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, []);
 
   const openApprove = (r: VictimReport) => {
@@ -334,6 +349,7 @@ export const AlertBroadcasting = () => {
         </Dialog>
       </div>
 
+      {canModerateVictimReports && (
       <Card className="overflow-hidden">
         <CardHeader className="p-4 sm:p-6">
           <div className="flex items-center gap-2">
@@ -341,7 +357,7 @@ export const AlertBroadcasting = () => {
             <CardTitle className="text-lg sm:text-xl">Pending victim reports</CardTitle>
           </div>
           <CardDescription className="text-xs sm:text-sm">
-            Review community submissions. Approving broadcasts only the alert fields below (title, message, type, audience). Evidence and reporter details stay in the report record.
+            Review community submissions. Approving broadcasts only the alert fields below (title, message, type, audience). Evidence and reporter details stay in the report record. (Admin only.)
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0 sm:p-6 pt-0">
@@ -403,7 +419,10 @@ export const AlertBroadcasting = () => {
           )}
         </CardContent>
       </Card>
+      )}
 
+      {canModerateVictimReports && (
+      <>
       <Dialog open={!!approveReport} onOpenChange={(o) => !o && setApproveReport(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -475,6 +494,8 @@ export const AlertBroadcasting = () => {
           </div>
         </DialogContent>
       </Dialog>
+      </>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

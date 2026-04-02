@@ -97,7 +97,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpGet("/api/victim-reports")]
-        [Authorize]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<ActionResult<IEnumerable<object>>> ListReports([FromQuery] string? status)
         {
             var q = _context.VictimReports.AsNoTracking().AsQueryable();
@@ -109,7 +109,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpGet("/api/victim-reports/{id}")]
-        [Authorize]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<ActionResult<object>> GetReport(string id)
         {
             var r = await _context.VictimReports.AsNoTracking().FirstOrDefaultAsync(x => x.VictimReportId == id);
@@ -119,7 +119,7 @@ namespace FYP_Project_II.Controllers
 
         /// <summary>Approve a pending report and broadcast it as an alert (same shape as manual alert creation).</summary>
         [HttpPost("/api/victim-reports/{id}/approve")]
-        [Authorize]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<ActionResult<object>> ApproveReport(string id, [FromBody] ApproveVictimReportRequest? body)
         {
             var report = await _context.VictimReports.FirstOrDefaultAsync(r => r.VictimReportId == id);
@@ -213,7 +213,7 @@ namespace FYP_Project_II.Controllers
         }
 
         [HttpPost("/api/victim-reports/{id}/reject")]
-        [Authorize]
+        [Authorize(Roles = "Admin, System Admin")]
         public async Task<ActionResult<object>> RejectReport(string id, [FromBody] RejectVictimReportRequest? body)
         {
             var report = await _context.VictimReports.FirstOrDefaultAsync(r => r.VictimReportId == id);
