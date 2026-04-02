@@ -103,6 +103,7 @@ export const SOSMonitoring = () => {
 
   useSOSSignalR(
     (payload: SOSUpdatePayload) => {
+      console.log('[SOS] SignalR SOSReceived:', payload);
       setSOSRequests(prev => {
         const existing = prev.find(s => s.id === payload.id);
         if (existing) return prev;
@@ -111,6 +112,7 @@ export const SOSMonitoring = () => {
       toast.success(`New SOS: ${payload.id}`);
     },
     (payload: SOSUpdatePayload) => {
+      console.log('[SOS] SignalR SOSUpdated:', payload);
       setSOSRequests(prev =>
         prev.map(s => s.id === payload.id ? mapApiToSOS(payload) : s)
       );
@@ -144,8 +146,11 @@ export const SOSMonitoring = () => {
     : sosRequests.filter(sos => sos.status === filterStatus);
 
   const handleAcceptSOS = async (sosId: string) => {
+    console.groupCollapsed(`[SOS] Accept clicked: ${sosId}`);
+    console.log('Request:', { accept: true });
     try {
       const updated = await sosApi.update(sosId, { accept: true });
+      console.log('Response:', updated);
       setSOSRequests(prev =>
         prev.map(s => (s.id === sosId ? mapApiToSOS(updated) : s))
       );
@@ -153,8 +158,12 @@ export const SOSMonitoring = () => {
         setSelectedSOS(mapApiToSOS(updated));
       }
       toast.success('SOS request accepted and assigned');
+      console.log('UI state updated for accepted SOS.');
     } catch (err) {
+      console.error('Accept failed:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to accept');
+    } finally {
+      console.groupEnd();
     }
   };
 

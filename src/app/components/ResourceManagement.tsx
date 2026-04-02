@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Package, Printer, Plus, Pencil, Trash2, MapPin } from 'lucide-react';
 import { CheckCircle, XCircle } from 'lucide-react';
-import { resourceApi, authApi } from '../lib/api';
-import type { Resource, ResourceRequest, Warehouse, Driver, ResourceUsageReport } from '../lib/types';
+import { resourceApi, authApi, shelterApi } from '../lib/api';
+import type { Resource, ResourceRequest, Warehouse, Driver, ResourceUsageReport, Shelter } from '../lib/types';
 import { toast } from 'sonner';
 import { useResourceSignalR } from '../hooks/useResourceSignalR';
 
@@ -30,6 +30,7 @@ export const ResourceManagement = () => {
   const [requests, setRequests] = useState<ResourceRequest[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [myShelter, setMyShelter] = useState<Shelter | null>(null);
   const [resourceManagers, setResourceManagers] = useState<Array<{ userId: string; name: string }>>([]);
   const [overallQuantity, setOverallQuantity] = useState<OverallQuantityItem[] | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('All');
@@ -42,6 +43,7 @@ export const ResourceManagement = () => {
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'System Admin';
   const isResourceManager = user?.role === 'Resource Manager';
+  const isShelterManager = user?.role === 'Shelter Manager';
 
   useResourceSignalR(
     (payload) => {
@@ -69,6 +71,13 @@ export const ResourceManagement = () => {
       setResources(resList as Resource[]);
       setRequests(reqList as ResourceRequest[]);
       setWarehouses(whList as Warehouse[]);
+
+      if (isShelterManager) {
+        const s = await shelterApi.getMyShelter().catch(() => null);
+        setMyShelter(s);
+      } else {
+        setMyShelter(null);
+      }
 
       if (isAdmin) {
         const [qty, users] = await Promise.all([
@@ -237,7 +246,11 @@ export const ResourceManagement = () => {
               <CardDescription>Submit a request for resource items. Available to all users.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResourceRequestForm resources={resources} onSuccess={fetchData} />
+              <ResourceRequestForm
+                resources={resources}
+                onSuccess={fetchData}
+                fixedDestination={isShelterManager && myShelter ? `${myShelter.name} • ${myShelter.location}` : null}
+              />
             </CardContent>
           </Card>
 
@@ -514,21 +527,39 @@ export const ResourceManagement = () => {
   );
 };
 
-function ResourceRequestForm({ resources, onSuccess }: { resources: Resource[]; onSuccess: () => void }) {
+function ResourceRequestForm({
+  resources,
+  onSuccess,
+  fixedDestination,
+}: {
+  resources: Resource[];
+  onSuccess: () => void;
+  fixedDestination: string | null;
+}) {
   const [resourceItemId, setResourceItemId] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [destination, setDestination] = useState('');
   const [urgency, setUrgency] = useState('Medium');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (fixedDestination) setDestination(fixedDestination);
+  }, [fixedDestination]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resourceItemId || quantity < 1) { toast.error('Please select a resource and enter quantity'); return; }
     setSubmitting(true);
     try {
-      await resourceApi.createResourceRequest({ resourceItemId, quantity, destination: destination || undefined, urgency: urgency || undefined });
+      const effectiveDestination = fixedDestination ?? destination;
+      await resourceApi.createResourceRequest({
+        resourceItemId,
+        quantity,
+        destination: effectiveDestination || undefined,
+        urgency: urgency || undefined
+      });
       toast.success('Request submitted');
-      setResourceItemId(''); setQuantity(1); setDestination(''); setUrgency('Medium');
+      setResourceItemId(''); setQuantity(1); setDestination(fixedDestination ?? ''); setUrgency('Medium');
       onSuccess();
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to submit'); }
     finally { setSubmitting(false); }
@@ -547,7 +578,14 @@ function ResourceRequestForm({ resources, onSuccess }: { resources: Resource[]; 
         </Select>
       </div>
       <div className="space-y-2"><Label>Quantity</Label><Input type="number" min={1} value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value) || 1)} /></div>
-      <div className="space-y-2"><Label>Destination</Label><Input placeholder="Where to deliver" value={destination} onChange={(e) => setDestination(e.target.value)} /></div>
+      <div className="space-y-2">
+        <Label>Destination</Label>
+        {fixedDestination ? (
+          <Input value={fixedDestination} readOnly aria-readonly="true" />
+        ) : (
+          <Input placeholder="Where to deliver" value={destination} onChange={(e) => setDestination(e.target.value)} />
+        )}
+      </div>
       <div className="space-y-2"><Label>Urgency</Label>
         <Select value={urgency} onValueChange={setUrgency}>
           <SelectTrigger><SelectValue /></SelectTrigger>

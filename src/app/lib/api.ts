@@ -254,6 +254,8 @@ function mapShelterApiToShelter(s: ShelterApi, evacuees: Evacuee[] = [], resourc
         id: s.shelterId,
         name: s.shelterName,
         location: s.address,
+        latitude: s.latitude,
+        longitude: s.longitude,
         TotalCapacity: s.totalCapacity,
         currentOccupancy: s.totalCapacity - s.availableCapacity,
         status: (s.status as Shelter['status']) || 'Open',
@@ -561,10 +563,20 @@ export const shelterApi = {
         };
     },
 
-    create: (data: { shelterName: string; address: string; totalCapacity: number; status?: string; managedBy?: string | null }) =>
+    create: (data: {
+        shelterName: string;
+        address: string;
+        latitude: number;
+        longitude: number;
+        totalCapacity: number;
+        status?: string;
+        managedBy?: string | null;
+    }) =>
         apiClient.post<ShelterApi>('/api/shelters', {
             shelterName: data.shelterName,
             address: data.address,
+            latitude: data.latitude,
+            longitude: data.longitude,
             totalCapacity: data.totalCapacity,
             availableCapacity: data.totalCapacity,
             status: data.status ?? 'Open',
@@ -632,12 +644,20 @@ export const shelterApi = {
     getRegistrationRequests: (myOnly = false) =>
         apiClient.get<ShelterRegistrationRequestApi[]>(`/api/shelters/registration-requests?myOnly=${myOnly}`),
 
-    createRegistrationRequest: (data: { shelterName: string; address: string; totalCapacity: number }) =>
+    createRegistrationRequest: (data: {
+        shelterName: string;
+        address: string;
+        latitude: number;
+        longitude: number;
+        totalCapacity: number;
+    }) =>
         apiClient.post<ShelterRegistrationRequestApi>('/api/shelters/registration-requests', {
             requestId: '',
             requestedBy: '',
             shelterName: data.shelterName,
             address: data.address,
+            latitude: data.latitude,
+            longitude: data.longitude,
             totalCapacity: data.totalCapacity,
             status: 'Pending',
             requestedAt: new Date().toISOString(),

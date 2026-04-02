@@ -6,6 +6,7 @@ namespace FYP_Project_II.Models
     {
         public string SOSRequestId { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty; // Mobile user identifier
+        public string TrackingToken { get; set; } = string.Empty; // Victim subscription token (mobile)
         public string VictimName { get; set; } = string.Empty;
         public string VictimContact { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;

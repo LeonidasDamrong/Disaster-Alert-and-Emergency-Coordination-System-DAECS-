@@ -1,2 +1,17 @@
 @import './tailwind.css';
 @import './theme.css';
+
+/*
+ * Google Places renders .pac-container on body. Radix modal Dialog sets body { pointer-events: none }
+ * so only the dialog receives clicks; without this, suggestions are visible but not clickable.
+ * Descendants can opt back in with pointer-events: auto (see MDN).
+ */
+.pac-container {
+  z-index: 10000 !important;
+  pointer-events: auto !important;
+}
+
+/*
+ * Typography + row layout for .pac-item are applied via JS (see googlePacDropdownStyles.ts)
+ * so the stylesheet is appended after Google Maps injects its CSS and wins the cascade.
+ */

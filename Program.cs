@@ -168,6 +168,7 @@ app.MapControllers();
 
 // SignalR hubs
 app.MapHub<SOSHub>("/hubs/sos");
+app.MapHub<SOSVictimHub>("/hubs/sos-victim");
 app.MapHub<ResourceHub>("/hubs/resources");
 app.MapHub<NotificationHub>("/hubs/notifications");
 

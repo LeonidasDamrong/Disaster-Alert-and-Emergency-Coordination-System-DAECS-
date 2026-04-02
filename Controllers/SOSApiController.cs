@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
@@ -134,6 +135,17 @@ namespace FYP_Project_II.Controllers
         };
         }
 
+        private static string GenerateTrackingToken()
+        {
+            // URL-safe base64 without padding.
+            Span<byte> bytes = stackalloc byte[24]; // 192 bits
+            RandomNumberGenerator.Fill(bytes);
+            return Convert.ToBase64String(bytes)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+        }
+
         /// <summary>
         /// Mobile API: Submit SOS request. No authentication required for emergency access.
         /// </summary>
@@ -154,21 +166,27 @@ namespace FYP_Project_II.Controllers
             }
 
             var prefix = "SOS";
+            // Keep backward compatible with older IDs like "SOS001" while generating the new format "SOSXXXX".
+            // Prefer longer IDs first (e.g. 7 chars "SOS0001" > 6 chars "SOS001"), then lexicographical.
             var lastId = await _context.SOSRequests
                 .Where(s => s.SOSRequestId.StartsWith(prefix))
-                .OrderByDescending(s => s.SOSRequestId)
+                .OrderByDescending(s => s.SOSRequestId.Length)
+                .ThenByDescending(s => s.SOSRequestId)
                 .Select(s => s.SOSRequestId)
                 .FirstOrDefaultAsync();
             var nextNum = 1;
             if (!string.IsNullOrEmpty(lastId) && int.TryParse(lastId.AsSpan(prefix.Length), out var n))
                 nextNum = n + 1;
+            // New ID format: SOSXXXX (4 digits, zero-padded)
             var sosId = $"{prefix}{nextNum:D4}";
 
             var now = DateTime.UtcNow;
+            var trackingToken = GenerateTrackingToken();
             var sos = new SOSRequest
             {
                 SOSRequestId = sosId,
                 UserId = request.UserId ?? Guid.NewGuid().ToString("N"),
+                TrackingToken = trackingToken,
                 VictimName = request.VictimName,
                 VictimContact = request.VictimContact,
                 Location = request.Location ?? "",
@@ -199,8 +217,15 @@ namespace FYP_Project_II.Controllers
             await _context.SaveChangesAsync();
 
             var dto = await MapToDtoAsync(sos);
-            await _hubContext.Clients.All.SendAsync("SOSReceived", dto);
-            return CreatedAtAction(nameof(GetSOS), new { id = sosId }, dto);
+            await _hubContext.Clients.Group(SOSHub.RespondersGroup).SendAsync("SOSReceived", dto);
+            return StatusCode(StatusCodes.Status201Created, new
+            {
+                id = sosId,
+                trackingToken,
+                status = "New",
+                createdAt = ToUtcIso(now),
+                updatedAt = ToUtcIso(now)
+            });
         }
 
         /// <summary>
@@ -313,7 +338,8 @@ namespace FYP_Project_II.Controllers
             await _context.SaveChangesAsync();
 
             var dto = await MapToDtoAsync(sos);
-            await _hubContext.Clients.All.SendAsync("SOSUpdated", dto);
+            await _hubContext.Clients.Group(SOSHub.RespondersGroup).SendAsync("SOSUpdated", dto);
+            await _hubContext.Clients.Group(SOSVictimHub.VictimGroupPrefix + id).SendAsync("SOSUpdated", dto);
             return Ok(dto);
         }
 
@@ -402,8 +428,10 @@ namespace FYP_Project_II.Controllers
             sos.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-
-            return Ok(await MapToDtoAsync(sos));
+            var dto = await MapToDtoAsync(sos);
+            await _hubContext.Clients.Group(SOSHub.RespondersGroup).SendAsync("SOSUpdated", dto);
+            await _hubContext.Clients.Group(SOSVictimHub.VictimGroupPrefix + id).SendAsync("SOSUpdated", dto);
+            return Ok(dto);
         }
 
         [HttpPost("{id}/notes")]

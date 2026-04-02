@@ -232,6 +232,8 @@ namespace FYP_Project_II.Data.Migrations
                     RequestedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ShelterName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Latitude = table.Column<double>(type: "float", nullable: false),
+                    Longitude = table.Column<double>(type: "float", nullable: false),
                     TotalCapacity = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -306,6 +308,7 @@ namespace FYP_Project_II.Data.Migrations
                 {
                     SOSRequestId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TrackingToken = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     VictimName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     VictimContact = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Location = table.Column<string>(type: "nvarchar(max)", nullable: false),

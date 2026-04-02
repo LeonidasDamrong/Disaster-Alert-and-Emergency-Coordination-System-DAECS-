@@ -1,13 +1,11 @@
 import React, { useCallback, useState } from 'react';
 import { useJsApiLoader, GoogleMap, Marker, useGoogleMap } from '@react-google-maps/api';
 import type { SOS } from '../lib/types';
+import { GOOGLE_MAPS_API_KEY, googleMapsLoaderOptions } from '../lib/googleMapsConfig';
 
 const mapContainerStyle = { width: '100%', height: '100%', minHeight: 600 };
 const defaultCenter = { lat: 3.1390, lng: 101.6869 }; // Kuala Lumpur
 const defaultZoom = 10;
-
-// Dummy/placeholder API key - replace with your Google Maps API key in .env
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_GOOGLE_MAPS_API_KEY';
 
 export interface DangerZoneData {
   id: string;
@@ -185,10 +183,7 @@ export function SOSMapView({
     return () => { delete window.gm_authFailure; };
   }, [currentOrigin]);
 
-  const { isLoaded, loadError: loaderError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
+  const { isLoaded, loadError: loaderError } = useJsApiLoader(googleMapsLoaderOptions);
   React.useEffect(() => {
     if (loaderError) {
       const msg = loaderError?.message || 'Failed to load Google Maps';

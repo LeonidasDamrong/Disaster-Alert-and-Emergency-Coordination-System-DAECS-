@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Home as HomeIcon, Users, MapPin, Plus, Printer, Loader2, LogOut, Package, FileCheck } from 'lucide-react';
+import { Home as HomeIcon, Users, MapPin, Plus, Printer, Loader2, LogOut } from 'lucide-react';
 import { Shelter, ShelterStatus, ShelterReportApi } from '../../lib/types';
 import { shelterApi } from '../../lib/api';
 import { toast } from 'sonner';
@@ -90,14 +90,6 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to generate report');
     }
-  };
-
-  const handleRequestResource = () => {
-    toast.info('Resource request will be available when the Resource Management module is completed.');
-  };
-
-  const handleRequestShelterRegistration = () => {
-    toast.info('Shelter registration request has been submitted for admin approval.');
   };
 
   const getStatusColor = (status: ShelterStatus) => {
@@ -279,16 +271,7 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
         </CardContent>
       </Card>
 
-      {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" className="gap-2" onClick={handleRequestResource} title="Resource module not yet available">
-          <Package className="h-4 w-4" />
-          Request resource
-        </Button>
-        <Button variant="outline" className="gap-2" onClick={handleRequestShelterRegistration}>
-          <FileCheck className="h-4 w-4" />
-          Request shelter registration
-        </Button>
         <Button variant="outline" className="gap-2" onClick={handleGenerateReport}>
           <Printer className="h-4 w-4" />
           Generate status report

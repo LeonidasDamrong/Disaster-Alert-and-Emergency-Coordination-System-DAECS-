@@ -563,6 +563,10 @@ namespace FYP_Project_II.Data.Migrations
                     b.Property<string>("SolvedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("TrackingToken")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -638,6 +642,12 @@ namespace FYP_Project_II.Data.Migrations
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("float");
 
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("datetime2");

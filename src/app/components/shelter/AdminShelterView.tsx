@@ -18,6 +18,8 @@ import { shelterApi } from '../../lib/api';
 import { authApi } from '../../lib/api';
 import { toast } from 'sonner';
 import { ShelterReportModal } from './ShelterReportModal';
+import { PlacesAddressAutocomplete } from '../PlacesAddressAutocomplete';
+import { hasValidShelterCoords } from '../../lib/shelterCoords';
 
 interface UserOption {
   userId: string;
@@ -35,7 +37,13 @@ export const AdminShelterView = () => {
   const [editShelter, setEditShelter] = useState<Shelter | null>(null);
   const [deleteShelter, setDeleteShelter] = useState<Shelter | null>(null);
   const [form, setForm] = useState({
-    shelterName: '', address: '', totalCapacity: 100, status: 'Open' as string, managedBy: '' as string | null
+    shelterName: '',
+    address: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
+    totalCapacity: 100,
+    status: 'Open' as string,
+    managedBy: '' as string | null,
   });
   const [registrationRequests, setRegistrationRequests] = useState<ShelterRegistrationRequestApi[]>([]);
   const [rejectDialog, setRejectDialog] = useState<{ requestId: string; request: ShelterRegistrationRequestApi } | null>(null);
@@ -101,17 +109,31 @@ export const AdminShelterView = () => {
       toast.error('Name and address are required');
       return;
     }
+    if (!hasValidShelterCoords(form.latitude, form.longitude)) {
+      toast.error('Pick a full address from the Google suggestions so coordinates can be saved');
+      return;
+    }
     try {
       await shelterApi.create({
         shelterName: form.shelterName,
         address: form.address,
+        latitude: form.latitude!,
+        longitude: form.longitude!,
         totalCapacity: form.totalCapacity,
         status: form.status,
         managedBy: form.managedBy || null
       });
       toast.success('Shelter created');
       setCreateOpen(false);
-      setForm({ shelterName: '', address: '', totalCapacity: 100, status: 'Open', managedBy: null });
+      setForm({
+        shelterName: '',
+        address: '',
+        latitude: null,
+        longitude: null,
+        totalCapacity: 100,
+        status: 'Open',
+        managedBy: null,
+      });
       await loadShelters();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to create shelter');
@@ -120,13 +142,19 @@ export const AdminShelterView = () => {
 
   const handleUpdateShelter = async () => {
     if (!editShelter || !form.shelterName.trim() || !form.address.trim()) return;
+    if (!hasValidShelterCoords(form.latitude, form.longitude)) {
+      toast.error('Pick a full address from the Google suggestions so coordinates can be saved');
+      return;
+    }
     try {
       await shelterApi.update(editShelter.id, {
         shelterId: editShelter.id,
         shelterName: form.shelterName,
         address: form.address,
+        latitude: form.latitude!,
+        longitude: form.longitude!,
         totalCapacity: form.totalCapacity,
-        availableCapacity: editShelter.TotalCapacity - editShelter.currentOccupancy,
+        availableCapacity: form.totalCapacity - editShelter.currentOccupancy,
         status: form.status as ShelterStatus,
         managedBy: form.managedBy || null,
         registeredAt: editShelter.createdAt,
@@ -181,6 +209,8 @@ export const AdminShelterView = () => {
     setForm({
       shelterName: shelter.name,
       address: shelter.location,
+      latitude: shelter.latitude ?? null,
+      longitude: shelter.longitude ?? null,
       totalCapacity: shelter.TotalCapacity,
       status: shelter.status,
       managedBy: shelter.manager || null
@@ -227,14 +257,51 @@ export const AdminShelterView = () => {
           <p className="text-gray-600">View and manage all shelters, assign managers, approve registrations</p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+          <Button
+            className="gap-2"
+            onClick={() => {
+              setForm({
+                shelterName: '',
+                address: '',
+                latitude: null,
+                longitude: null,
+                totalCapacity: 100,
+                status: 'Open',
+                managedBy: null,
+              });
+              setCreateOpen(true);
+            }}
+          >
             <Plus className="h-4 w-4" /> Add shelter
           </Button>
           <DialogContent>
             <DialogHeader><DialogTitle>Create shelter</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2"><Label>Name</Label><Input value={form.shelterName} onChange={(e) => setForm({ ...form, shelterName: e.target.value })} placeholder="Shelter name" /></div>
-              <div className="grid gap-2"><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Address" /></div>
+              <div className="grid gap-2">
+                <Label>Name</Label>
+                <Input value={form.shelterName} readOnly aria-readonly="true" placeholder="Will be set from selected place" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Address</Label>
+                <PlacesAddressAutocomplete
+                  value={form.address}
+                  onChange={(address) => setForm((f) => ({ ...f, address }))}
+                  onPlaceResolved={(p) =>
+                    setForm((f) =>
+                      p
+                        ? {
+                          ...f,
+                          shelterName: (p.name || p.address.split(',')[0] || '').trim(),
+                          address: p.address,
+                          latitude: p.latitude,
+                          longitude: p.longitude,
+                        }
+                        : { ...f, latitude: null, longitude: null },
+                    )
+                  }
+                  placeholder="Search address in Malaysia"
+                />
+              </div>
               <div className="grid gap-2"><Label>Total capacity</Label><Input type="number" value={form.totalCapacity} onChange={(e) => setForm({ ...form, totalCapacity: parseInt(e.target.value, 10) || 0 })} /></div>
               <div className="grid gap-2"><Label>Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
@@ -491,8 +558,31 @@ export const AdminShelterView = () => {
           <DialogContent>
             <DialogHeader><DialogTitle>Edit shelter</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2"><Label>Name</Label><Input value={form.shelterName} onChange={(e) => setForm({ ...form, shelterName: e.target.value })} /></div>
-              <div className="grid gap-2"><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+              <div className="grid gap-2">
+                <Label>Name</Label>
+                <Input value={form.shelterName} readOnly aria-readonly="true" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Address</Label>
+                <PlacesAddressAutocomplete
+                  value={form.address}
+                  onChange={(address) => setForm((f) => ({ ...f, address }))}
+                  onPlaceResolved={(p) =>
+                    setForm((f) =>
+                      p
+                        ? {
+                          ...f,
+                          shelterName: (p.name || p.address.split(',')[0] || '').trim(),
+                          address: p.address,
+                          latitude: p.latitude,
+                          longitude: p.longitude,
+                        }
+                        : { ...f, latitude: null, longitude: null },
+                    )
+                  }
+                  placeholder="Search address in Malaysia"
+                />
+              </div>
               <div className="grid gap-2"><Label>Total capacity</Label><Input type="number" value={form.totalCapacity} onChange={(e) => setForm({ ...form, totalCapacity: parseInt(e.target.value, 10) || 0 })} /></div>
               <div className="grid gap-2"><Label>Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>

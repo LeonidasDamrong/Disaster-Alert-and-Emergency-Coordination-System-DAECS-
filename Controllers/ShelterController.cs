@@ -92,7 +92,7 @@ namespace FYP_Project_II.Controllers
             await _context.SaveChangesAsync();
             await LogAuditAsync("Shelter Registration Request", $"Requested registration: {request.ShelterName}");
 
-            return CreatedAtAction(nameof(GetRegistrationRequests), new { id = request.RequestId }, request);
+            return CreatedAtAction(nameof(GetRegistrationRequests), null, request);
         }
 
         [HttpPost("registration-requests/{requestId}/approve")]
@@ -109,6 +109,8 @@ namespace FYP_Project_II.Controllers
                 ShelterId = await GenerateNextShelterIdAsync(),
                 ShelterName = req.ShelterName,
                 Address = req.Address,
+                Latitude = req.Latitude,
+                Longitude = req.Longitude,
                 TotalCapacity = req.TotalCapacity,
                 AvailableCapacity = req.TotalCapacity,
                 Status = "Open",

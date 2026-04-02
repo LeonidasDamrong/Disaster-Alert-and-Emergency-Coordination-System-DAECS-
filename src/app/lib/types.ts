@@ -66,6 +66,8 @@ export interface Shelter {
   id: string;
   name: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   TotalCapacity: number;
   currentOccupancy: number;
   status: ShelterStatus;
@@ -92,6 +94,8 @@ export interface ShelterApi {
   shelterId: string;
   shelterName: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
   totalCapacity: number;
   availableCapacity: number;
   status: string;
@@ -142,6 +146,8 @@ export interface ShelterRegistrationRequestApi {
   requestedBy: string;
   shelterName: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
   totalCapacity: number;
   status: 'Pending' | 'Approved' | 'Rejected';
   requestedAt: string;
