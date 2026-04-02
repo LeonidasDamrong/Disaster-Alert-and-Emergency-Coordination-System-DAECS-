@@ -13,5 +13,8 @@ namespace FYP_Project_II.Models
         public DateTime? SentAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        /// <summary>Optional link when this alert was created from an approved victim report.</summary>
+        public string? SourceVictimReportId { get; set; }
     }
 }

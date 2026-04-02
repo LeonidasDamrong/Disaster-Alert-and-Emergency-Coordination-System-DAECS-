@@ -59,6 +59,33 @@ export interface Alert {
   createdAt: string;
 }
 
+/** Victim/community incident report (API + DB). Pending items are reviewed here before broadcast as an alert. */
+export type VictimReportStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface VictimReport {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  severity: string;
+  lat: number;
+  lng: number;
+  locationName: string;
+  safetyInfo: string;
+  source: string;
+  reporterEmail: string;
+  reporterName: string;
+  hasEvidence: boolean;
+  imageUrl?: string | null;
+  status: VictimReportStatus;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  rejectionReason?: string | null;
+  createdAlertId?: string | null;
+}
+
 // Shelter Types
 export type ShelterStatus = 'Open' | 'Full' | 'Closed';
 

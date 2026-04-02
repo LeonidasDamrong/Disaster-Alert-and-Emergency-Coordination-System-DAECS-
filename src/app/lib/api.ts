@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.MODE === 'production'
     ? '' // Production: same origin
     : 'http://localhost:5191'; // Development: ASP.NET Core dev server
 
-import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi, ShelterRegistrationRequestApi, SOS, SOSStatus, UrgencyLevel, CaseNote } from './types';
+import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi, ShelterRegistrationRequestApi, SOS, SOSStatus, UrgencyLevel, CaseNote, VictimReport } from './types';
 
 // API Client with JWT token support
 class ApiClient {
@@ -246,6 +246,56 @@ export const alertApi = {
             sentAt?: string | null;
             createdAt: string;
         }>(`/api/alerts/${encodeURIComponent(id)}/cancel`),
+};
+
+/** Pending victim/community reports — approve creates a broadcast alert using only alert fields (title, message, type, targetAudience). */
+export const victimReportApi = {
+    list: (status?: string) => {
+        const q = status ? `?status=${encodeURIComponent(status)}` : '';
+        return apiClient.get<VictimReport[]>(`/api/victim-reports${q}`);
+    },
+
+    getById: (id: string) =>
+        apiClient.get<VictimReport>(`/api/victim-reports/${encodeURIComponent(id)}`),
+
+    approve: (
+        id: string,
+        body?: {
+            title?: string;
+            message?: string;
+            type?: string;
+            targetAudience?: string;
+            scheduledFor?: string | null;
+        }
+    ) =>
+        apiClient.post<{
+            victimReportId: string;
+            alert: {
+                id: string;
+                title: string;
+                message: string;
+                type: string;
+                targetAudience: string;
+                status: string;
+                createdBy: string;
+                scheduledFor?: string | null;
+                sentAt?: string | null;
+                createdAt: string;
+                sourceVictimReportId?: string | null;
+            };
+        }>(`/api/victim-reports/${encodeURIComponent(id)}/approve`, {
+            ...body,
+            scheduledFor:
+                body?.scheduledFor != null && body.scheduledFor !== ''
+                    ? new Date(body.scheduledFor).toISOString()
+                    : null,
+        }),
+
+    reject: (id: string, reason?: string) =>
+        apiClient.post<{ id: string; status: string; reviewedAt?: string; rejectionReason?: string | null }>(
+            `/api/victim-reports/${encodeURIComponent(id)}/reject`,
+            { reason: reason ?? '' }
+        ),
 };
 
 // Map backend shelter to UI Shelter (without evacuees/resources - load separately)

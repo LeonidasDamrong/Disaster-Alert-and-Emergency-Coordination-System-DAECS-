@@ -6,6 +6,16 @@ namespace FYP_Project_II.Data
 {
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+            builder.Entity<VictimReport>(e =>
+            {
+                e.Property(x => x.Latitude).HasPrecision(18, 8);
+                e.Property(x => x.Longitude).HasPrecision(18, 8);
+            });
+        }
+
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Shelter> Shelters { get; set; }
@@ -23,6 +33,7 @@ namespace FYP_Project_II.Data
         public DbSet<CaseNote> CaseNotes { get; set; }
         public DbSet<DangerZone> DangerZones { get; set; }
         public DbSet<Alert> Alerts { get; set; }
+        public DbSet<VictimReport> VictimReports { get; set; }
         public DbSet<SystemSettings> SystemSettings { get; set; }
     }
 }
