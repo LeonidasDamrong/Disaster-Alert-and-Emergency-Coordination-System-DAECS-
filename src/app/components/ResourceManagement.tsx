@@ -15,6 +15,7 @@ import { resourceApi, authApi, shelterApi } from '../lib/api';
 import type { Resource, ResourceRequest, Warehouse, Driver, ResourceUsageReport, Shelter } from '../lib/types';
 import { toast } from 'sonner';
 import { useResourceSignalR } from '../hooks/useResourceSignalR';
+import { PlacesAddressAutocomplete } from './PlacesAddressAutocomplete';
 
 interface OverallQuantityItem {
   name: string;
@@ -354,7 +355,15 @@ export const ResourceManagement = () => {
                     <DialogHeader><DialogTitle>Edit Warehouse</DialogTitle></DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div><Label>Name</Label><Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} /></div>
-                      <div><Label>Address</Label><Input value={editForm.address} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} /></div>
+                      <div className="grid gap-2">
+                        <Label>Address</Label>
+                        <PlacesAddressAutocomplete
+                          value={editForm.address}
+                          onChange={(address) => setEditForm((f) => ({ ...f, address }))}
+                          onPlaceResolved={() => { }}
+                          placeholder="Search warehouse address (Malaysia)"
+                        />
+                      </div>
                       <div>
                         <Label>Assign manager</Label>
                         <Select value={editForm.managedBy ?? 'none'} onValueChange={(v) => setEditForm((f) => ({ ...f, managedBy: v === 'none' ? null : v }))}>
@@ -484,10 +493,24 @@ export const ResourceManagement = () => {
                               )}
                               {req.status === 'Approved' && (
                                 <div className="flex gap-2 items-center">
-                                  <Select onValueChange={(v) => handleAssignDriver(req.resourceRequestId, v)}>
-                                    <SelectTrigger className="w-36"><SelectValue placeholder="Assign driver" /></SelectTrigger>
-                                    <SelectContent>{drivers.map((d) => <SelectItem key={d.driverId} value={d.driverId}>{d.name}</SelectItem>)}</SelectContent>
-                                  </Select>
+                                  {req.assignedDriverId ? (
+                                    <div className="flex items-center gap-2">
+                                      <Badge className="bg-green-100 text-green-800 border border-green-200">
+                                        Assigned: {req.driverName || req.assignedDriverId}
+                                      </Badge>
+                                    </div>
+                                  ) : (
+                                    <Select onValueChange={(v) => handleAssignDriver(req.resourceRequestId, v)}>
+                                      <SelectTrigger className="w-44"><SelectValue placeholder="Assign driver" /></SelectTrigger>
+                                      <SelectContent>
+                                        {drivers.length === 0 ? (
+                                          <SelectItem value="__none__" disabled>No available drivers</SelectItem>
+                                        ) : (
+                                          drivers.map((d) => <SelectItem key={d.driverId} value={d.driverId}>{d.name}</SelectItem>)
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
                                   <Button size="sm" onClick={() => handleMarkDelivered(req.resourceRequestId)}>Mark Delivered</Button>
                                 </div>
                               )}
@@ -583,7 +606,17 @@ function ResourceRequestForm({
         {fixedDestination ? (
           <Input value={fixedDestination} readOnly aria-readonly="true" />
         ) : (
-          <Input placeholder="Where to deliver" value={destination} onChange={(e) => setDestination(e.target.value)} />
+          <PlacesAddressAutocomplete
+            value={destination}
+            onChange={setDestination}
+            onPlaceResolved={(p) => {
+              if (!p) return;
+              const name = (p.name || '').trim();
+              const address = (p.address || '').trim();
+              setDestination(name ? `${name} • ${address}` : address);
+            }}
+            placeholder="Search delivery destination (Malaysia)"
+          />
         )}
       </div>
       <div className="space-y-2"><Label>Urgency</Label>

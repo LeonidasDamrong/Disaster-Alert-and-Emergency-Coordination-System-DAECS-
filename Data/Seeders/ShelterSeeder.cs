@@ -43,15 +43,16 @@ namespace FYP_Project_II.Data.Seeders
             {
                 var shelterResources = new[]
                 {
-                    new ShelterResource { ShelterResourceId = "SR001", ShelterId = "SHEL001", ResourceType = "Food", Quantity = 500, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR002", ShelterId = "SHEL001", ResourceType = "Medical Supplies", Quantity = 50, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR003", ShelterId = "SHEL001", ResourceType = "Blankets", Quantity = 200, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR004", ShelterId = "SHEL001", ResourceType = "Water", Quantity = 1000, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR005", ShelterId = "SHEL002", ResourceType = "Food", Quantity = 300, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR006", ShelterId = "SHEL002", ResourceType = "Water", Quantity = 500, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR007", ShelterId = "SHEL002", ResourceType = "Hygiene Kits", Quantity = 100, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR008", ShelterId = "SHEL003", ResourceType = "Food", Quantity = 150, CreatedAt = baseDate, UpdatedAt = baseDate },
-                    new ShelterResource { ShelterResourceId = "SR009", ShelterId = "SHEL003", ResourceType = "Water", Quantity = 200, CreatedAt = baseDate, UpdatedAt = baseDate }
+                    // Link shelter inventory to warehouse resources via ResourceItemId (RESxxx).
+                    new ShelterResource { ShelterResourceId = "SR001", ShelterId = "SHEL001", ResourceItemId = "RES002", ResourceType = "Canned Food", Quantity = 500, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR002", ShelterId = "SHEL001", ResourceItemId = "RES003", ResourceType = "First Aid Kits", Quantity = 50, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR003", ShelterId = "SHEL001", ResourceItemId = "RES004", ResourceType = "Blankets", Quantity = 200, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR004", ShelterId = "SHEL001", ResourceItemId = "RES001", ResourceType = "Drinking Water", Quantity = 1000, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR005", ShelterId = "SHEL002", ResourceItemId = "RES002", ResourceType = "Canned Food", Quantity = 300, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR006", ShelterId = "SHEL002", ResourceItemId = "RES001", ResourceType = "Drinking Water", Quantity = 500, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR007", ShelterId = "SHEL002", ResourceItemId = null, ResourceType = "Hygiene Kits", Quantity = 100, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR008", ShelterId = "SHEL003", ResourceItemId = "RES002", ResourceType = "Canned Food", Quantity = 150, CreatedAt = baseDate, UpdatedAt = baseDate },
+                    new ShelterResource { ShelterResourceId = "SR009", ShelterId = "SHEL003", ResourceItemId = "RES001", ResourceType = "Drinking Water", Quantity = 200, CreatedAt = baseDate, UpdatedAt = baseDate }
                 };
                 await dbContext.ShelterResources.AddRangeAsync(shelterResources);
                 Console.WriteLine("Seeded Shelter Resources");

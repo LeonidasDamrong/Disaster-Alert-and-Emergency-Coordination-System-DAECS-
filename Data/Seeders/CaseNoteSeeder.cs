@@ -14,20 +14,20 @@ namespace FYP_Project_II.Data.Seeders
                 .Select(s => s.SOSRequestId)
                 .ToListAsync();
 
-            if (!sosIds.Contains("SOS002") && !sosIds.Contains("SOS003")) return;
+            if (!sosIds.Contains("SOS0002") && !sosIds.Contains("SOS0003")) return;
 
             var baseDate = new DateTime(2024, 1, 15, 8, 0, 0, DateTimeKind.Utc);
 
             var notes = new List<CaseNote>();
 
-            if (sosIds.Contains("SOS002"))
+            if (sosIds.Contains("SOS0002"))
             {
                 notes.AddRange(new[]
                 {
                     new CaseNote
                     {
                         CaseNoteId = "NOTE001",
-                        SOSRequestId = "SOS002",
+                        SOSRequestId = "SOS0002",
                         ResponderId = "responder001",
                         Note = "Arrived at vicinity. Flood water rising; requesting barricade support.",
                         Timestamp = baseDate.AddHours(2).AddMinutes(20)
@@ -35,7 +35,7 @@ namespace FYP_Project_II.Data.Seeders
                     new CaseNote
                     {
                         CaseNoteId = "NOTE002",
-                        SOSRequestId = "SOS002",
+                        SOSRequestId = "SOS0002",
                         ResponderId = "responder001",
                         Note = "Victim contacted. Safe location confirmed. Coordinating with shelter manager for pickup.",
                         Timestamp = baseDate.AddHours(2).AddMinutes(45)
@@ -43,14 +43,14 @@ namespace FYP_Project_II.Data.Seeders
                 });
             }
 
-            if (sosIds.Contains("SOS003"))
+            if (sosIds.Contains("SOS0003"))
             {
                 notes.AddRange(new[]
                 {
                     new CaseNote
                     {
                         CaseNoteId = "NOTE003",
-                        SOSRequestId = "SOS003",
+                        SOSRequestId = "SOS0003",
                         ResponderId = "responder001",
                         Note = "Evacuation completed. Victim moved to nearest shelter and registered.",
                         Timestamp = baseDate.AddHours(-1).AddMinutes(-15)
@@ -58,7 +58,7 @@ namespace FYP_Project_II.Data.Seeders
                     new CaseNote
                     {
                         CaseNoteId = "NOTE004",
-                        SOSRequestId = "SOS003",
+                        SOSRequestId = "SOS0003",
                         ResponderId = "responder001",
                         Note = "Completion proof uploaded. Marking case as completed.",
                         Timestamp = baseDate.AddHours(-1)

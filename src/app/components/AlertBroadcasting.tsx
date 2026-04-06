@@ -44,6 +44,8 @@ export const AlertBroadcasting = () => {
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [alertDetailsOpen, setAlertDetailsOpen] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<AlertType | null>(null);
   const [newAlert, setNewAlert] = useState({
     title: '',
     message: '',
@@ -256,8 +258,89 @@ export const AlertBroadcasting = () => {
   const typeLabel = (type: string) => (isMobile && typeShort[type]) ? typeShort[type] : type;
   const statusLabel = (status: string) => (isMobile && statusShort[status]) ? statusShort[status] : status;
 
+  const formatWhen = (iso?: string) => iso ? new Date(iso).toLocaleString('en-MY') : '—';
+
   return (
     <div className="space-y-6 min-w-0 max-w-full overflow-hidden">
+      <Dialog
+        open={alertDetailsOpen}
+        onOpenChange={(o) => {
+          setAlertDetailsOpen(o);
+          if (!o) {
+            // Let the close animation finish before clearing content
+            window.setTimeout(() => setSelectedAlert(null), 180);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Alert details</DialogTitle>
+            <DialogDescription>Full alert payload as stored in the system.</DialogDescription>
+          </DialogHeader>
+          {selectedAlert && (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">ID</p>
+                <p className="font-mono text-sm">{selectedAlert.id}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Title</p>
+                <p className="text-sm font-semibold">{selectedAlert.title}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Type</p>
+                  <Badge className={`${getAlertTypeColor(selectedAlert.type)} border text-xs w-fit`}>
+                    {selectedAlert.type}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <Badge variant={
+                    selectedAlert.status === 'Sent' ? 'default' :
+                      selectedAlert.status === 'Scheduled' ? 'secondary' :
+                        'outline'
+                  } className="text-xs w-fit">
+                    {selectedAlert.status}
+                  </Badge>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Target audience</p>
+                <p className="text-sm">{selectedAlert.targetAudience}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Message</p>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <p className="text-sm whitespace-pre-wrap break-words">{selectedAlert.message}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Created by</p>
+                  <p>{selectedAlert.createdBy || '—'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Created at</p>
+                  <p>{formatWhen(selectedAlert.createdAt)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Scheduled for</p>
+                  <p>{formatWhen(selectedAlert.scheduledFor)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Sent at</p>
+                  <p>{formatWhen(selectedAlert.sentAt)}</p>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setAlertDetailsOpen(false)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-xl sm:text-3xl font-bold truncate">Alert Broadcasting</h2>
@@ -557,7 +640,15 @@ export const AlertBroadcasting = () => {
                     </TableRow>
                   ) : (
                     alerts.map((alert) => (
-                      <TableRow key={alert.id}>
+                      <TableRow
+                        key={alert.id}
+                        className="cursor-pointer"
+                        onClick={() => {
+                          setSelectedAlert(alert);
+                          setAlertDetailsOpen(true);
+                        }}
+                        title="Click to view details"
+                      >
                         <TableCell className="font-mono text-xs truncate">{alert.id}</TableCell>
                         <TableCell className="font-semibold text-sm truncate max-w-[140px]" title={alert.title}>{alert.title}</TableCell>
                         <TableCell>
@@ -588,6 +679,8 @@ export const AlertBroadcasting = () => {
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 gap-1 text-xs h-7 px-2"
                                 onClick={() => handleBroadcastNow(alert.id)}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClickCapture={(e) => e.stopPropagation()}
                               >
                                 <Send className="h-3 w-3" />
                                 Now
@@ -597,6 +690,8 @@ export const AlertBroadcasting = () => {
                                 size="sm"
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs h-7 px-2"
                                 onClick={() => handleCancelAlert(alert.id)}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClickCapture={(e) => e.stopPropagation()}
                               >
                                 <XCircle className="h-3 w-3" />
                                 <span className="hidden sm:inline">Cancel</span>

@@ -486,8 +486,15 @@ namespace FYP_Project_II.Controllers
             var driver = await _context.Drivers.FindAsync(dto.DriverId);
             if (driver == null) return BadRequest(new { message = "Driver not found." });
 
+            if (!string.Equals(driver.Status, "Available", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Driver is not available." });
+
             req.AssignedDriverId = dto.DriverId;
             req.UpdatedAt = DateTime.UtcNow;
+
+            driver.Status = "Busy";
+            driver.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
             await LogAuditAsync("Assign Driver", $"Assigned driver {dto.DriverId} to request {requestId}");
             return Ok(req);
@@ -511,6 +518,75 @@ namespace FYP_Project_II.Controllers
 
             req.Status = "Delivered";
             req.UpdatedAt = DateTime.UtcNow;
+
+            // If the destination matches a registered shelter, reflect the delivery in shelter inventory.
+            // Destination can be "ShelterName • Address" (UI default) or just "ShelterName".
+            if (!string.IsNullOrWhiteSpace(req.Destination))
+            {
+                var dest = req.Destination.Trim();
+                var namePart = dest.Split('•', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                if (!string.IsNullOrWhiteSpace(namePart))
+                {
+                    // EF Core cannot translate StringComparison-based StartsWith reliably.
+                    // Load a small list and match in-memory.
+                    var shelters = await _context.Shelters
+                        .Select(s => new { s.ShelterId, s.ShelterName })
+                        .ToListAsync();
+
+                    var shelter = shelters.FirstOrDefault(s =>
+                        string.Equals(s.ShelterName, namePart, StringComparison.OrdinalIgnoreCase) ||
+                        dest.StartsWith(s.ShelterName + " ", StringComparison.OrdinalIgnoreCase));
+
+                    if (shelter != null)
+                    {
+                        // Prefer alignment by ResourceItemId (warehouse resource ID).
+                        // Fallback: for older rows seeded without ResourceItemId, match by ResourceType name.
+                        var existingInv = await _context.ShelterResources.FirstOrDefaultAsync(r =>
+                            r.ShelterId == shelter.ShelterId &&
+                            (
+                                (r.ResourceItemId != null && r.ResourceItemId == req.ResourceItemId) ||
+                                (r.ResourceItemId == null && r.ResourceType == req.ItemName)
+                            ));
+
+                        if (existingInv != null)
+                        {
+                            existingInv.Quantity += req.Quantity;
+                            existingInv.ResourceItemId ??= req.ResourceItemId;
+                            existingInv.ResourceType = string.IsNullOrWhiteSpace(existingInv.ResourceType)
+                                ? (string.IsNullOrWhiteSpace(req.ItemName) ? (req.Type ?? "Resource") : req.ItemName)
+                                : existingInv.ResourceType;
+                            existingInv.UpdatedAt = DateTime.UtcNow;
+                        }
+                        else
+                        {
+                            _context.ShelterResources.Add(new ShelterResource
+                            {
+                                ShelterResourceId = await GenerateNextShelterResourceIdAsync(),
+                                ShelterId = shelter.ShelterId,
+                                ResourceItemId = req.ResourceItemId,
+                                ResourceType = string.IsNullOrWhiteSpace(req.ItemName) ? (req.Type ?? "Resource") : req.ItemName,
+                                Quantity = req.Quantity,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            });
+                        }
+
+                        var shelterEntity = await _context.Shelters.FindAsync(shelter.ShelterId);
+                        if (shelterEntity != null) shelterEntity.LastModifiedAt = DateTime.UtcNow;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(req.AssignedDriverId))
+            {
+                var driver = await _context.Drivers.FindAsync(req.AssignedDriverId);
+                if (driver != null)
+                {
+                    driver.Status = "Available";
+                    driver.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
             await _context.SaveChangesAsync();
             await LogAuditAsync("Mark Delivered", $"Request {requestId} marked as delivered");
             return Ok(req);
@@ -521,7 +597,11 @@ namespace FYP_Project_II.Controllers
         [Authorize(Roles = "Resource Manager, Admin, System Admin")]
         public async Task<ActionResult<IEnumerable<Driver>>> GetDrivers()
         {
-            return await _context.Drivers.OrderBy(d => d.Name).ToListAsync();
+            // For assignment dropdowns, return only available drivers.
+            return await _context.Drivers
+                .Where(d => d.Status == "Available")
+                .OrderBy(d => d.Name)
+                .ToListAsync();
         }
 
         // ========== Resource Usage Report ==========
@@ -603,6 +683,21 @@ namespace FYP_Project_II.Controllers
                 if (int.TryParse(suf, out int n)) next = n + 1;
             }
             return $"RSL{next:D4}";
+        }
+
+        private async Task<string> GenerateNextShelterResourceIdAsync()
+        {
+            var last = await _context.ShelterResources
+                .OrderByDescending(r => r.ShelterResourceId)
+                .FirstOrDefaultAsync();
+
+            var next = 1;
+            if (last != null && last.ShelterResourceId.StartsWith("SR", StringComparison.OrdinalIgnoreCase))
+            {
+                var suf = last.ShelterResourceId.Length > 2 ? last.ShelterResourceId[2..] : "";
+                if (int.TryParse(suf, out var n)) next = n + 1;
+            }
+            return $"SR{next:D3}";
         }
 
         private async Task LogAuditAsync(string action, string details)

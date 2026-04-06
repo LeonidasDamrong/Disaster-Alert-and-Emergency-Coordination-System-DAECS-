@@ -1,4 +1,5 @@
 using FYP_Project_II.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace FYP_Project_II.Data.Seeders
 {
@@ -18,6 +19,34 @@ namespace FYP_Project_II.Data.Seeders
                 };
                 await dbContext.Drivers.AddRangeAsync(drivers);
                 Console.WriteLine("Seeded Drivers");
+            }
+
+            // Keep driver availability connected to existing requests:
+            // any driver assigned to an Approved (in-progress) request becomes Busy.
+            var busyDriverIds = await dbContext.ResourceRequests
+                .Where(r => r.Status == "Approved" && r.AssignedDriverId != null && r.AssignedDriverId != "")
+                .Select(r => r.AssignedDriverId!)
+                .Distinct()
+                .ToListAsync();
+
+            var driversToUpdate = await dbContext.Drivers.ToListAsync();
+            var now = DateTime.UtcNow;
+            var updated = false;
+            foreach (var d in driversToUpdate)
+            {
+                var next = busyDriverIds.Contains(d.DriverId) ? "Busy" : "Available";
+                if (!string.Equals(d.Status, next, StringComparison.OrdinalIgnoreCase))
+                {
+                    d.Status = next;
+                    d.UpdatedAt = now;
+                    updated = true;
+                }
+            }
+
+            if (updated)
+            {
+                await dbContext.SaveChangesAsync();
+                Console.WriteLine("Updated driver availability from resource requests");
             }
         }
     }
