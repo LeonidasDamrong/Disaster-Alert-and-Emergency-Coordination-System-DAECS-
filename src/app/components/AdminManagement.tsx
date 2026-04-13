@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { authApi, auditLogApi, systemSettingsApi, announcementApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useIsMobile } from './ui/use-mobile';
+import { sortByIdDesc } from '../lib/sort';
 
 const getShortName = (s: string) => (s && s.split(' - ')[0]) || s || '';
 
@@ -570,8 +571,7 @@ export const AdminManagement = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users
-                        .map((user) => (
+                      {sortByIdDesc(users, (u) => u.userId ?? u.id).map((user) => (
                           <TableRow key={user.id ?? user.userId}>
                             <TableCell className="font-mono">{user.userId}</TableCell>
                             <TableCell className="font-semibold">{user.name}</TableCell>
@@ -639,7 +639,7 @@ export const AdminManagement = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {auditLogs.map((log) => (
+                    {sortByIdDesc(auditLogs, (l) => l.id).map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="text-sm">
                           {new Date(log.timestamp).toLocaleString('en-MY')}

@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { ShelterReportModal } from './ShelterReportModal';
 import { PlacesAddressAutocomplete } from '../PlacesAddressAutocomplete';
 import { hasValidShelterCoords } from '../../lib/shelterCoords';
+import { sortByIdDesc } from '../../lib/sort';
 
 interface UserOption {
   userId: string;
@@ -355,7 +356,10 @@ export const AdminShelterView = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {registrationRequests.filter(r => r.status === 'Pending').map((req) => (
+                  {sortByIdDesc(
+                    registrationRequests.filter(r => r.status === 'Pending'),
+                    (r) => r.requestId
+                  ).map((req) => (
                     <TableRow key={req.requestId}>
                       <TableCell className="font-mono text-sm">{req.requestId}</TableCell>
                       <TableCell>{req.shelterName}</TableCell>
@@ -395,7 +399,10 @@ export const AdminShelterView = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {registrationRequests.filter(r => r.status !== 'Pending').map((req) => (
+                  {sortByIdDesc(
+                    registrationRequests.filter(r => r.status !== 'Pending'),
+                    (r) => r.requestId
+                  ).map((req) => (
                     <TableRow key={req.requestId}>
                       <TableCell className="font-mono text-sm">{req.requestId}</TableCell>
                       <TableCell>{req.shelterName}</TableCell>
@@ -492,7 +499,10 @@ export const AdminShelterView = () => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {(selectedShelter?.id === shelter.id ? selectedShelter : current).evacuees.map((ev) => (
+                                {sortByIdDesc(
+                                  (selectedShelter?.id === shelter.id ? selectedShelter : current).evacuees,
+                                  (e) => e.id
+                                ).map((ev) => (
                                   <TableRow key={ev.id}>
                                     <TableCell className="font-medium">{ev.name}</TableCell>
                                     <TableCell>{ev.idNumber || '-'}</TableCell>

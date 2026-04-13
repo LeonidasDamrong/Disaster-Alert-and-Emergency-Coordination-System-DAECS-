@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -15,6 +15,7 @@ import { useSOSSignalR, type SOSUpdatePayload } from '../hooks/useSOSSignalR';
 import { SOSMapView, type DangerZoneData } from './SOSMapView';
 import { SOSStatus, UrgencyLevel, SOS, CaseNote } from '../lib/types';
 import { toast } from 'sonner';
+import { sortByIdDesc } from '../lib/sort';
 
 function mapApiToSOS(r: {
   id: string;
@@ -144,6 +145,11 @@ export const SOSMonitoring = () => {
   const filteredSOS = filterStatus === 'All'
     ? sosRequests
     : sosRequests.filter(sos => sos.status === filterStatus);
+
+  const sortedFilteredSOS = useMemo(
+    () => sortByIdDesc(filteredSOS, (s) => s.id),
+    [filteredSOS]
+  );
 
   const handleAcceptSOS = async (sosId: string) => {
     console.groupCollapsed(`[SOS] Accept clicked: ${sosId}`);
@@ -326,7 +332,7 @@ export const SOSMonitoring = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSOS.map((sos) => (
+                {sortedFilteredSOS.map((sos) => (
                   <TableRow key={sos.id}>
                     <TableCell className="font-mono">{sos.id}</TableCell>
                     <TableCell>

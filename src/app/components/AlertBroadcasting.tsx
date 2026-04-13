@@ -14,6 +14,7 @@ import type { Alert as AlertType, AlertType as SeverityType, AlertStatus, Victim
 import { toast } from 'sonner';
 import { useIsMobile } from './ui/use-mobile';
 import { useAuth } from '../context/AuthContext';
+import { sortByIdDesc } from '../lib/sort';
 
 const typeShort: Record<string, string> = { Emergency: 'Emerg', Warning: 'Warn', Information: 'Info', 'All Clear': 'Clear' };
 const statusShort: Record<string, string> = { Sent: 'Sent', Scheduled: 'Sched', Canceled: 'Canc' };
@@ -31,7 +32,7 @@ function buildDefaultAlertMessage(r: VictimReport): string {
   if (r.safetyInfo?.trim()) parts.push(r.safetyInfo.trim());
   parts.push(`Location: ${r.locationName} (${r.lat}, ${r.lng})`);
   return parts.join('\n\n');
-}
+} 
 
 export const AlertBroadcasting = () => {
   const isMobile = useIsMobile();
@@ -466,7 +467,7 @@ export const AlertBroadcasting = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pendingReports.map((r) => (
+                  {sortByIdDesc(pendingReports, (x) => x.id).map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs">{r.id}</TableCell>
                       <TableCell className="text-sm font-medium truncate max-w-[160px]" title={r.title}>{r.title}</TableCell>
@@ -639,7 +640,7 @@ export const AlertBroadcasting = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    alerts.map((alert) => (
+                    sortByIdDesc(alerts, (a) => a.id).map((alert) => (
                       <TableRow
                         key={alert.id}
                         className="cursor-pointer"

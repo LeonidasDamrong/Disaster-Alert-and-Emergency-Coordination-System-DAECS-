@@ -16,6 +16,7 @@ import type { Resource, ResourceRequest, Warehouse, Driver, ResourceUsageReport,
 import { toast } from 'sonner';
 import { useResourceSignalR } from '../hooks/useResourceSignalR';
 import { PlacesAddressAutocomplete } from './PlacesAddressAutocomplete';
+import { sortByIdDesc } from '../lib/sort';
 
 interface OverallQuantityItem {
   name: string;
@@ -637,6 +638,7 @@ function ResourceRequestForm({
 
 function ResourceRequestsTable({ requests, getStatusColor, getUrgencyColor }: { requests: ResourceRequest[]; getStatusColor: (s: string) => string; getUrgencyColor: (s: string) => string }) {
   if (requests.length === 0) return <p className="text-gray-500">No requests</p>;
+  const sorted = sortByIdDesc(requests, (r) => r.resourceRequestId);
   return (
     <Table>
       <TableHeader>
@@ -650,7 +652,7 @@ function ResourceRequestsTable({ requests, getStatusColor, getUrgencyColor }: { 
         </TableRow>
       </TableHeader>
       <TableBody>
-        {requests.map((req) => (
+        {sorted.map((req) => (
           <TableRow key={req.resourceRequestId}>
             <TableCell className="font-mono text-sm">{req.resourceRequestId}</TableCell>
             <TableCell><div><p className="font-semibold">{req.itemName}</p><p className="text-xs text-gray-600">{req.type}</p></div></TableCell>

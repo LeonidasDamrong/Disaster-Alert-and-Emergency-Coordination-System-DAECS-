@@ -10,6 +10,7 @@ import { Shelter, ShelterStatus, ShelterReportApi } from '../../lib/types';
 import { shelterApi } from '../../lib/api';
 import { toast } from 'sonner';
 import { ShelterReportModal } from './ShelterReportModal';
+import { sortByIdDesc } from '../../lib/sort';
 
 interface ShelterManagerAssignedViewProps {
   shelter: Shelter;
@@ -199,7 +200,7 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {shelter.evacuees.map((ev) => (
+              {sortByIdDesc(shelter.evacuees, (e) => e.id).map((ev) => (
                 <TableRow key={ev.id}>
                   <TableCell className="font-medium">{ev.name}</TableCell>
                   <TableCell>{ev.age}</TableCell>
