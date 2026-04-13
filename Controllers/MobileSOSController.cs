@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using System.Security.Cryptography;
 
 namespace FYP_Project_II.Controllers
 {
@@ -22,6 +23,17 @@ namespace FYP_Project_II.Controllers
             _context = context;
             _hubContext = hubContext;
             _logger = logger;
+        }
+
+        private static string GenerateTrackingToken()
+        {
+            // URL-safe base64 without padding.
+            Span<byte> bytes = stackalloc byte[24]; // 192 bits
+            RandomNumberGenerator.Fill(bytes);
+            return Convert.ToBase64String(bytes)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
         }
 
         /// <summary>
@@ -82,6 +94,7 @@ namespace FYP_Project_II.Controllers
             {
                 SOSRequestId = sosId,
                 UserId = Guid.NewGuid().ToString("N"),
+                TrackingToken = GenerateTrackingToken(),
                 VictimName = victimName,
                 VictimContact = victimContact,
                 Location = location,
@@ -136,7 +149,7 @@ namespace FYP_Project_II.Controllers
 
             await _hubContext.Clients.Group(SOSHub.RespondersGroup).SendAsync("SOSReceived", dto);
 
-            return StatusCode(StatusCodes.Status201Created, new { id = sosId });
+            return StatusCode(StatusCodes.Status201Created, new { id = sosId, trackingToken = sos.TrackingToken, status = sos.SOSStatus });
         }
 
         private static string MapSeverityToUrgency(string? severity)

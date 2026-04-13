@@ -329,6 +329,43 @@ namespace FYP_Project_II.Controllers
             return Ok(dtos);
         }
 
+        /// <summary>
+        /// Victim/mobile polling: get SOS status snapshot using tracking token (anonymous).
+        /// </summary>
+        /// <remarks>
+        /// Use this for HTTP polling from mobile apps. Token is returned from POST /api/sos.
+        /// </remarks>
+        [HttpGet("{id}/victim-status")]
+        [AllowAnonymous]
+        public async Task<ActionResult<object>> GetVictimStatus(string id, [FromQuery] string trackingToken)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return BadRequest(new { message = "id is required." });
+            if (string.IsNullOrWhiteSpace(trackingToken)) return BadRequest(new { message = "trackingToken is required." });
+
+            var sos = await _context.SOSRequests
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.SOSRequestId == id);
+
+            if (sos == null) return NotFound(new { message = "SOS request not found." });
+
+            if (!string.Equals(sos.TrackingToken, trackingToken.Trim(), StringComparison.Ordinal))
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Invalid tracking token." });
+
+            var (assignedResponder, assignedResponderName) = await ResolveAssignedResponderAsync(sos);
+
+            return Ok(new
+            {
+                id = sos.SOSRequestId,
+                status = sos.SOSStatus ?? "New",
+                assignedResponderId = sos.AssignedResponderId,
+                assignedResponder = assignedResponder, // backward-compatible naming with existing DTOs
+                assignedResponderName = assignedResponderName,
+                etaMinutes = (int?)null,
+                updatedAt = ToUtcIso(sos.UpdatedAt),
+                solvedAt = ToUtcIso(sos.SolvedAt)
+            });
+        }
+
         [HttpGet("{id}")]
         [Authorize]
         public async Task<ActionResult<object>> GetSOS(string id)
