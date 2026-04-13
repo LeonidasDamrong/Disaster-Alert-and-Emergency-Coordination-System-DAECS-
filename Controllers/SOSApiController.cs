@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
@@ -41,6 +43,75 @@ namespace FYP_Project_II.Controllers
             _logger = logger;
             _configuration = configuration;
             _blobServiceClient = blobServiceClient;
+        }
+
+        // Reverse geocoding (best-effort) for display purposes.
+        // Uses OpenStreetMap Nominatim; keep timeouts low and swallow failures.
+        private static readonly HttpClient _geoHttp = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(2)
+        };
+
+        private static string? GetFirstNonEmpty(JsonElement address, params string[] keys)
+        {
+            foreach (var k in keys)
+            {
+                if (address.TryGetProperty(k, out var v))
+                {
+                    var s = v.GetString();
+                    if (!string.IsNullOrWhiteSpace(s)) return s.Trim();
+                }
+            }
+            return null;
+        }
+
+        private static string? BuildAreaState(JsonElement address)
+        {
+            // "Area" is intentionally flexible: suburb/neighbourhood/city/town/village/municipality/county.
+            var area =
+                GetFirstNonEmpty(address, "suburb", "neighbourhood", "city_district", "city", "town", "village", "municipality", "county");
+            var state = GetFirstNonEmpty(address, "state", "region");
+
+            if (!string.IsNullOrWhiteSpace(area) && !string.IsNullOrWhiteSpace(state))
+                return $"{area}, {state}";
+            if (!string.IsNullOrWhiteSpace(state))
+                return state;
+            return area;
+        }
+
+        private static async Task<string?> TryReverseGeocodeAsync(decimal lat, decimal lng)
+        {
+            try
+            {
+                // Nominatim requires a User-Agent.
+                if (_geoHttp.DefaultRequestHeaders.UserAgent.Count == 0)
+                {
+                    _geoHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("FYP-Project-II", "1.0"));
+                }
+
+                var url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat.ToString(System.Globalization.CultureInfo.InvariantCulture)}&lon={lng.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+                using var res = await _geoHttp.GetAsync(url);
+                if (!res.IsSuccessStatusCode) return null;
+
+                var json = await res.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("address", out var addr) && addr.ValueKind == JsonValueKind.Object)
+                {
+                    var simple = BuildAreaState(addr);
+                    if (!string.IsNullOrWhiteSpace(simple)) return simple;
+                }
+
+                if (doc.RootElement.TryGetProperty("display_name", out var dn))
+                {
+                    var s = dn.GetString();
+                    return string.IsNullOrWhiteSpace(s) ? null : s;
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static string ToUtcIso(DateTime dt) =>
@@ -112,13 +183,22 @@ namespace FYP_Project_II.Controllers
         private async Task<object> MapToDtoAsync(SOSRequest r)
         {
             var (assignedResponder, assignedResponderName) = await ResolveAssignedResponderAsync(r);
+            var rawLocation = r.Location ?? "";
+            var looksLikeLatLng =
+                string.IsNullOrWhiteSpace(rawLocation) ||
+                rawLocation.StartsWith("Lat:", StringComparison.OrdinalIgnoreCase) ||
+                rawLocation.StartsWith("Lat ", StringComparison.OrdinalIgnoreCase);
+
+            var locationName = looksLikeLatLng ? await TryReverseGeocodeAsync(r.Latitude, r.Longitude) : rawLocation;
+
             return new
         {
             id = r.SOSRequestId,
             userId = r.UserId,
             victimName = r.VictimName ?? "",
             victimPhone = r.VictimContact ?? "",
-            location = r.Location ?? "",
+            location = rawLocation,
+            locationName = locationName,
             latitude = r.Latitude,
             longitude = r.Longitude,
             description = r.Description ?? "",

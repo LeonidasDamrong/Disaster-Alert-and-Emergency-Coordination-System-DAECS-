@@ -22,6 +22,7 @@ function mapApiToSOS(r: {
   victimName: string;
   victimPhone: string;
   location: string;
+  locationName?: string | null;
   latitude: number;
   longitude: number;
   description: string;
@@ -39,7 +40,7 @@ function mapApiToSOS(r: {
     id: r.id,
     victimName: r.victimName ?? '',
     victimPhone: r.victimPhone ?? '',
-    location: r.location ?? '',
+    location: (r.locationName ?? r.location) ?? '',
     latitude: Number(r.latitude) || 0,
     longitude: Number(r.longitude) || 0,
     description: r.description ?? '',

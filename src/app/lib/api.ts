@@ -465,6 +465,7 @@ export const sosApi = {
             victimName: string;
             victimPhone: string;
             location: string;
+            locationName?: string | null;
             latitude: number;
             longitude: number;
             description: string;
@@ -484,6 +485,7 @@ export const sosApi = {
             victimName: string;
             victimPhone: string;
             location: string;
+            locationName?: string | null;
             latitude: number;
             longitude: number;
             description: string;
