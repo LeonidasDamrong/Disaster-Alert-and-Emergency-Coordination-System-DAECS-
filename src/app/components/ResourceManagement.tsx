@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useResourceSignalR } from '../hooks/useResourceSignalR';
 import { PlacesAddressAutocomplete } from './PlacesAddressAutocomplete';
 import { sortByIdDesc } from '../lib/sort';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface OverallQuantityItem {
   name: string;
@@ -42,6 +43,12 @@ export const ResourceManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showReport, setShowReport] = useState(false);
   const [reportData, setReportData] = useState<ResourceUsageReport[]>([]);
+  const [warehouseSaveConfirmOpen, setWarehouseSaveConfirmOpen] = useState(false);
+  const [approveReqConfirm, setApproveReqConfirm] = useState<{ requestId: string; itemName: string } | null>(null);
+  const [rejectReqConfirm, setRejectReqConfirm] = useState<{ requestId: string; itemName: string } | null>(null);
+  const [assignDriverConfirm, setAssignDriverConfirm] = useState<{ requestId: string; driverId: string; driverName: string } | null>(null);
+  const [markDeliveredConfirm, setMarkDeliveredConfirm] = useState<{ requestId: string; itemName: string } | null>(null);
+  const [generateReportConfirmOpen, setGenerateReportConfirmOpen] = useState(false);
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'System Admin';
   const isResourceManager = user?.role === 'Resource Manager';
@@ -136,7 +143,12 @@ export const ResourceManagement = () => {
     }
   };
 
-  const handleUpdateWarehouse = async () => {
+  const requestUpdateWarehouse = () => {
+    if (!editWarehouse) return;
+    setWarehouseSaveConfirmOpen(true);
+  };
+
+  const performUpdateWarehouse = async () => {
     if (!editWarehouse) return;
     try {
       await resourceApi.updateWarehouse(editWarehouse.warehouseId, {
@@ -149,6 +161,7 @@ export const ResourceManagement = () => {
       fetchData();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to update');
+      throw e;
     }
   };
 
@@ -157,52 +170,64 @@ export const ResourceManagement = () => {
     setEditForm({ name: wh.name, address: wh.address, managedBy: wh.managedBy ?? null });
   };
 
-  const handleApproveRequest = async (requestId: string) => {
+  const performApproveRequest = async () => {
+    if (!approveReqConfirm) return;
     try {
-      await resourceApi.approveResourceRequest(requestId);
+      await resourceApi.approveResourceRequest(approveReqConfirm.requestId);
       toast.success('Request approved');
       fetchData();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to approve');
+      throw e;
     }
   };
 
-  const handleRejectRequest = async (requestId: string) => {
+  const requestRejectRequest = (requestId: string, itemName: string) => {
     if (!rejectionNote.trim()) {
       toast.error('Please provide a rejection reason');
       return;
     }
+    setRejectReqConfirm({ requestId, itemName });
+  };
+
+  const performRejectRequest = async () => {
+    if (!rejectReqConfirm) return;
     try {
-      await resourceApi.rejectResourceRequest(requestId, rejectionNote);
+      await resourceApi.rejectResourceRequest(rejectReqConfirm.requestId, rejectionNote);
       toast.success('Request rejected');
       setRejectionNote('');
       fetchData();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to reject');
+      throw e;
     }
   };
 
-  const handleAssignDriver = async (requestId: string, driverId: string) => {
+  const performAssignDriver = async () => {
+    if (!assignDriverConfirm) return;
     try {
-      await resourceApi.assignDriver(requestId, driverId);
+      await resourceApi.assignDriver(assignDriverConfirm.requestId, assignDriverConfirm.driverId);
       toast.success('Driver assigned');
       fetchData();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to assign driver');
+      throw e;
     }
   };
 
-  const handleMarkDelivered = async (requestId: string) => {
+  const performMarkDelivered = async () => {
+    if (!markDeliveredConfirm) return;
     try {
-      await resourceApi.markDelivered(requestId);
+      await resourceApi.markDelivered(markDeliveredConfirm.requestId);
       toast.success('Marked as delivered');
       fetchData();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to mark delivered');
+      throw e;
     }
   };
 
-  const handleGenerateReport = async () => {
+  const performGenerateReport = async () => {
     try {
       setLoading(true);
       const data = await resourceApi.getUsageReport();
@@ -211,6 +236,7 @@ export const ResourceManagement = () => {
       toast.success('Report generated successfully');
     } catch (e) {
       toast.error('Failed to generate report');
+      throw e;
     } finally {
       setLoading(false);
     }
@@ -328,7 +354,7 @@ export const ResourceManagement = () => {
                       <CardTitle>Resource Usage Report</CardTitle>
                       <CardDescription>Generate report for all resource warehouses</CardDescription>
                     </div>
-                    <Button variant="outline" onClick={handleGenerateReport} className="gap-2">
+                    <Button variant="outline" onClick={() => setGenerateReportConfirmOpen(true)} className="gap-2">
                       <Printer className="h-4 w-4" />
                       Generate Report
                     </Button>
@@ -378,7 +404,7 @@ export const ResourceManagement = () => {
                         </Select>
                       </div>
                     </div>
-                    <Button onClick={handleUpdateWarehouse}>Save changes</Button>
+                    <Button onClick={requestUpdateWarehouse}>Save changes</Button>
                   </DialogContent>
                 </Dialog>
               )}
@@ -393,7 +419,7 @@ export const ResourceManagement = () => {
                 resources={resources}
                 warehouses={warehouses}
                 onSuccess={fetchData}
-                onGenerateReport={handleGenerateReport}
+                onGenerateReport={() => setGenerateReportConfirmOpen(true)}
               />
 
               <Card>
@@ -481,12 +507,12 @@ export const ResourceManagement = () => {
                                       </div>
                                       <div className="flex gap-2">
                                         <Button
-                                          onClick={() => handleApproveRequest(req.resourceRequestId)}
+                                          onClick={() => setApproveReqConfirm({ requestId: req.resourceRequestId, itemName: req.itemName })}
                                           disabled={(resources.find(r => r.resourceItemId === req.resourceItemId)?.quantity ?? 0) < req.quantity}
                                         >
                                           <CheckCircle className="h-4 w-4 mr-2" />Approve
                                         </Button>
-                                        <Button variant="destructive" onClick={() => handleRejectRequest(req.resourceRequestId)} disabled={!rejectionNote.trim()}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
+                                        <Button variant="destructive" onClick={() => requestRejectRequest(req.resourceRequestId, req.itemName)} disabled={!rejectionNote.trim()}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
                                       </div>
                                     </div>
                                   </DialogContent>
@@ -501,7 +527,15 @@ export const ResourceManagement = () => {
                                       </Badge>
                                     </div>
                                   ) : (
-                                    <Select onValueChange={(v) => handleAssignDriver(req.resourceRequestId, v)}>
+                                    <Select
+                                      onValueChange={(v) =>
+                                        setAssignDriverConfirm({
+                                          requestId: req.resourceRequestId,
+                                          driverId: v,
+                                          driverName: drivers.find((d) => d.driverId === v)?.name ?? v,
+                                        })
+                                      }
+                                    >
                                       <SelectTrigger className="w-44"><SelectValue placeholder="Assign driver" /></SelectTrigger>
                                       <SelectContent>
                                         {drivers.length === 0 ? (
@@ -512,7 +546,7 @@ export const ResourceManagement = () => {
                                       </SelectContent>
                                     </Select>
                                   )}
-                                  <Button size="sm" onClick={() => handleMarkDelivered(req.resourceRequestId)}>Mark Delivered</Button>
+                                  <Button size="sm" onClick={() => setMarkDeliveredConfirm({ requestId: req.resourceRequestId, itemName: req.itemName })}>Mark Delivered</Button>
                                 </div>
                               )}
                               {req.status === 'Delivered' && <div className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle className="h-4 w-4" /> Delivered</div>}
@@ -544,6 +578,99 @@ export const ResourceManagement = () => {
               data={reportData}
             />
           )}
+
+          <ConfirmDialog
+            open={warehouseSaveConfirmOpen}
+            onOpenChange={setWarehouseSaveConfirmOpen}
+            title="Save warehouse changes?"
+            description={
+              editWarehouse ? (
+                <span>
+                  Updates will apply to <strong>{editWarehouse.name}</strong> including address and manager assignment.
+                </span>
+              ) : (
+                'Save the edited warehouse details.'
+              )
+            }
+            confirmLabel="Save changes"
+            confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+            onConfirm={performUpdateWarehouse}
+          />
+
+          <ConfirmDialog
+            open={!!approveReqConfirm}
+            onOpenChange={(open) => !open && setApproveReqConfirm(null)}
+            title="Approve this resource request?"
+            description={
+              approveReqConfirm ? (
+                <span>
+                  Approve delivery of <strong>{approveReqConfirm.itemName}</strong> for this request? Stock will be reserved or deducted according to system rules.
+                </span>
+              ) : null
+            }
+            confirmLabel="Yes, approve"
+            confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+            onConfirm={performApproveRequest}
+          />
+
+          <ConfirmDialog
+            open={!!rejectReqConfirm}
+            onOpenChange={(open) => !open && setRejectReqConfirm(null)}
+            variant="destructive"
+            title="Reject this resource request?"
+            description={
+              rejectReqConfirm ? (
+                <span>
+                  Reject <strong>{rejectReqConfirm.itemName}</strong>? The reason you entered will be stored with the request.
+                </span>
+              ) : null
+            }
+            confirmLabel="Yes, reject"
+            onConfirm={performRejectRequest}
+          />
+
+          <ConfirmDialog
+            open={!!assignDriverConfirm}
+            onOpenChange={(open) => !open && setAssignDriverConfirm(null)}
+            title="Assign this driver?"
+            description={
+              assignDriverConfirm ? (
+                <span>
+                  Assign <strong>{assignDriverConfirm.driverName}</strong> to request{' '}
+                  <span className="font-mono">{assignDriverConfirm.requestId}</span>?
+                </span>
+              ) : null
+            }
+            confirmLabel="Assign driver"
+            confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+            onConfirm={performAssignDriver}
+          />
+
+          <ConfirmDialog
+            open={!!markDeliveredConfirm}
+            onOpenChange={(open) => !open && setMarkDeliveredConfirm(null)}
+            title="Mark request as delivered?"
+            description={
+              markDeliveredConfirm ? (
+                <span>
+                  Mark <strong>{markDeliveredConfirm.itemName}</strong> as delivered for this request? This usually means the shipment was completed.
+                </span>
+              ) : null
+            }
+            confirmLabel="Mark delivered"
+            confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+            onConfirm={performMarkDelivered}
+          />
+
+          <ConfirmDialog
+            open={generateReportConfirmOpen}
+            onOpenChange={setGenerateReportConfirmOpen}
+            title="Generate resource usage report?"
+            description="Load inventory and usage data for all warehouses and open the report viewer?"
+            confirmLabel="Generate report"
+            confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+            onConfirm={performGenerateReport}
+          />
         </>
       )
       }
@@ -565,14 +692,19 @@ function ResourceRequestForm({
   const [destination, setDestination] = useState('');
   const [urgency, setUrgency] = useState('Medium');
   const [submitting, setSubmitting] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (fixedDestination) setDestination(fixedDestination);
   }, [fixedDestination]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const requestSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!resourceItemId || quantity < 1) { toast.error('Please select a resource and enter quantity'); return; }
+    setSubmitConfirmOpen(true);
+  };
+
+  const performSubmit = async () => {
     setSubmitting(true);
     try {
       const effectiveDestination = fixedDestination ?? destination;
@@ -585,12 +717,13 @@ function ResourceRequestForm({
       toast.success('Request submitted');
       setResourceItemId(''); setQuantity(1); setDestination(fixedDestination ?? ''); setUrgency('Medium');
       onSuccess();
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to submit'); }
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to submit'); throw err; }
     finally { setSubmitting(false); }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <>
+    <form onSubmit={requestSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <div className="space-y-2"><Label>Resource Item</Label>
         <Select value={resourceItemId} onValueChange={setResourceItemId} required>
           <SelectTrigger><SelectValue placeholder="Select resource..." /></SelectTrigger>
@@ -633,6 +766,16 @@ function ResourceRequestForm({
       </div>
       <div className="md:col-span-2 lg:col-span-4"><Button type="submit" disabled={submitting}>Submit Request</Button></div>
     </form>
+    <ConfirmDialog
+      open={submitConfirmOpen}
+      onOpenChange={setSubmitConfirmOpen}
+      title="Submit this resource request?"
+      description="Your request will be sent to resource managers for review. Continue?"
+      confirmLabel="Yes, submit request"
+      confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+      onConfirm={performSubmit}
+    />
+    </>
   );
 }
 
@@ -678,49 +821,68 @@ function ResourceManagerCRUD({ resources, warehouses, onSuccess, onGenerateRepor
   const [createData, setCreateData] = useState({ name: '', type: '', unit: 'units', quantity: 0, status: 'Available' });
   const [editData, setEditData] = useState({ name: '', type: '', unit: 'units', quantity: 0, status: '' });
   const [stockInData, setStockInData] = useState({ quantityAdded: 0, source: '' });
+  const [createConfirmOpen, setCreateConfirmOpen] = useState(false);
+  const [updateConfirmOpen, setUpdateConfirmOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [stockInConfirmOpen, setStockInConfirmOpen] = useState(false);
 
   const myWh = warehouses.find((w) => w.managedBy === user?.userId);
   const whId = myWh?.warehouseId ?? '';
 
-  const handleCreate = async () => {
+  const requestCreate = () => {
     if (!whId) { toast.error('You are not assigned to a warehouse'); return; }
+    setCreateConfirmOpen(true);
+  };
+
+  const performCreate = async () => {
+    if (!whId) return;
     try {
       await resourceApi.createResource({ ...createData, warehouseId: whId });
       toast.success('Resource created');
       setShowCreate(false);
       setCreateData({ name: '', type: '', unit: 'units', quantity: 0, status: 'Available' });
       onSuccess();
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); throw e; }
   };
 
-  const handleUpdate = async () => {
+  const requestUpdate = () => {
+    if (!editing) return;
+    setUpdateConfirmOpen(true);
+  };
+
+  const performUpdate = async () => {
     if (!editing) return;
     try {
       await resourceApi.updateResource(editing.resourceItemId, editData);
       toast.success('Resource updated');
       setEditing(null);
       onSuccess();
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); throw e; }
   };
 
-  const handleDelete = async (resourceItemId: string) => {
-    if (!confirm('Delete this resource?')) return;
+  const performDelete = async () => {
+    if (!deleteConfirmId) return;
     try {
-      await resourceApi.deleteResource(resourceItemId);
+      await resourceApi.deleteResource(deleteConfirmId);
       toast.success('Resource deleted');
       onSuccess();
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); throw e; }
   };
 
-  const handleStockIn = async () => {
+  const requestStockIn = () => {
     if (!stockInResource || stockInData.quantityAdded <= 0 || !stockInData.source.trim()) { toast.error('Enter quantity and source'); return; }
+    setStockInConfirmOpen(true);
+  };
+
+  const performStockIn = async () => {
+    if (!stockInResource) return;
     try {
       await resourceApi.stockIn(stockInResource.resourceItemId, stockInData);
       toast.success('Stock added');
       setStockInResource(null);
       setStockInData({ quantityAdded: 0, source: '' });
       onSuccess();
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); throw e; }
   };
 
   return (
@@ -745,7 +907,7 @@ function ResourceManagerCRUD({ resources, warehouses, onSuccess, onGenerateRepor
                   <div><Label>Type</Label><Input value={createData.type} onChange={(e) => setCreateData((d) => ({ ...d, type: e.target.value }))} /></div>
                   <div><Label>Unit</Label><Input value={createData.unit} onChange={(e) => setCreateData((d) => ({ ...d, unit: e.target.value }))} /></div>
                   <div><Label>Quantity</Label><Input type="number" value={createData.quantity} onChange={(e) => setCreateData((d) => ({ ...d, quantity: parseInt(e.target.value) || 0 }))} /></div>
-                  <Button onClick={handleCreate} disabled={!whId}>Create</Button>
+                  <Button onClick={requestCreate} disabled={!whId}>Create</Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -764,7 +926,7 @@ function ResourceManagerCRUD({ resources, warehouses, onSuccess, onGenerateRepor
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => { setStockInResource(r); setStockInData({ quantityAdded: 0, source: '' }); }}>Stock In</Button>
                 <Button variant="outline" size="sm" onClick={() => { setEditing(r); setEditData({ name: r.name, type: r.type, unit: r.unit, quantity: r.quantity, status: r.status }); }}><Pencil className="h-4 w-4" /></Button>
-                <Button variant="outline" size="sm" onClick={() => handleDelete(r.resourceItemId)}><Trash2 className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(r.resourceItemId)}><Trash2 className="h-4 w-4" /></Button>
               </div>
             </div>
           ))}
@@ -777,7 +939,7 @@ function ResourceManagerCRUD({ resources, warehouses, onSuccess, onGenerateRepor
               <div className="space-y-4">
                 <div><Label>Quantity to Add</Label><Input type="number" min={1} value={stockInData.quantityAdded} onChange={(e) => setStockInData((d) => ({ ...d, quantityAdded: parseInt(e.target.value) || 0 }))} /></div>
                 <div><Label>Source</Label><Input placeholder="e.g. Donation, Purchase, Transfer" value={stockInData.source} onChange={(e) => setStockInData((d) => ({ ...d, source: e.target.value }))} /></div>
-                <Button onClick={handleStockIn}>Add Stock</Button>
+                <Button onClick={requestStockIn}>Add Stock</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -792,11 +954,75 @@ function ResourceManagerCRUD({ resources, warehouses, onSuccess, onGenerateRepor
                 <div><Label>Type</Label><Input value={editData.type} onChange={(e) => setEditData((d) => ({ ...d, type: e.target.value }))} /></div>
                 <div><Label>Unit</Label><Input value={editData.unit} onChange={(e) => setEditData((d) => ({ ...d, unit: e.target.value }))} /></div>
                 <div><Label>Quantity</Label><Input type="number" value={editData.quantity} onChange={(e) => setEditData((d) => ({ ...d, quantity: parseInt(e.target.value) || 0 }))} /></div>
-                <Button onClick={handleUpdate}>Update</Button>
+                <Button onClick={requestUpdate}>Update</Button>
               </div>
             </DialogContent>
           </Dialog>
         )}
+
+        <ConfirmDialog
+          open={createConfirmOpen}
+          onOpenChange={setCreateConfirmOpen}
+          title="Create this resource item?"
+          description={
+            <span>
+              Add <strong>{createData.name || '—'}</strong> ({createData.type || '—'}) with initial quantity <strong>{createData.quantity}</strong> {createData.unit} to {myWh?.name ?? 'your warehouse'}?
+            </span>
+          }
+          confirmLabel="Yes, create"
+          confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+          onConfirm={performCreate}
+        />
+
+        <ConfirmDialog
+          open={updateConfirmOpen}
+          onOpenChange={setUpdateConfirmOpen}
+          title="Save resource changes?"
+          description={
+            editing ? (
+              <span>
+                Update <strong>{editing.name}</strong> with the edited name, quantity, and status?
+              </span>
+            ) : (
+              'Save changes to this resource.'
+            )
+          }
+          confirmLabel="Save changes"
+          confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+          onConfirm={performUpdate}
+        />
+
+        <ConfirmDialog
+          open={!!deleteConfirmId}
+          onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+          variant="destructive"
+          title="Delete this resource?"
+          description={
+            deleteConfirmId ? (
+              <span>
+                Permanently remove <strong>{resources.find((r) => r.resourceItemId === deleteConfirmId)?.name ?? 'this item'}</strong> from inventory? This cannot be undone.
+              </span>
+            ) : null
+          }
+          confirmLabel="Delete resource"
+          onConfirm={performDelete}
+        />
+
+        <ConfirmDialog
+          open={stockInConfirmOpen}
+          onOpenChange={setStockInConfirmOpen}
+          title="Add stock to this item?"
+          description={
+            stockInResource ? (
+              <span>
+                Add <strong>{stockInData.quantityAdded}</strong> {stockInResource.unit} to <strong>{stockInResource.name}</strong> from source “{stockInData.source.trim()}”?
+              </span>
+            ) : null
+          }
+          confirmLabel="Add stock"
+          confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+          onConfirm={performStockIn}
+        />
       </CardContent>
     </Card>
   );

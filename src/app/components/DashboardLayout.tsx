@@ -16,9 +16,11 @@ import {
   PanelLeftOpen,
   Menu,
   X,
+  KeyRound,
 } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { systemSettingsApi } from '../lib/api';
+import { systemSettingsApi, authApi } from '../lib/api';
+import { getNewPasswordValidationErrors, PASSWORD_REQUIREMENTS_SUMMARY } from '../lib/passwordPolicy';
 import { SystemSettings } from '../lib/types';
 import { mockSystemSettings } from '../lib/mockData';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -27,6 +29,17 @@ import { useSOSSignalR } from '../hooks/useSOSSignalR';
 import { useResourceSignalR } from '../hooks/useResourceSignalR';
 import { useNotificationSignalR } from '../hooks/useNotificationSignalR';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -148,7 +161,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     !!user
   );
 
-  const handleLogout = () => {
+  const confirmLogout = () => {
     logout();
     navigate('/login');
   };
@@ -170,6 +183,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const sidebarWidth = sidebarCollapsed ? 'w-16' : 'w-64';
   const mainMarginClass = sidebarCollapsed ? 'md:ml-16' : 'md:ml-64';
 
@@ -180,6 +200,46 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     const short = settings.systemName.split(' - ')[0];
     return short || settings.systemName;
   }, [settings.systemName]);
+
+  const resetPasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+  };
+
+  const newPasswordPolicyErrors = useMemo(
+    () => (newPassword.length > 0 ? getNewPasswordValidationErrors(newPassword) : []),
+    [newPassword]
+  );
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match. Re-enter the new password in both fields.');
+      return;
+    }
+    const policyErrors = getNewPasswordValidationErrors(newPassword);
+    if (policyErrors.length > 0) {
+      const lines =
+        policyErrors.length === 1
+          ? policyErrors[0]
+          : ['The new password does not meet the requirements:', ...policyErrors.map((line) => `• ${line}`)].join('\n');
+      setPasswordError(lines);
+      return;
+    }
+    setPasswordSubmitting(true);
+    try {
+      await authApi.changePassword(currentPassword, newPassword);
+      setChangePasswordOpen(false);
+      resetPasswordForm();
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Could not change password.');
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -313,10 +373,26 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                   <Badge variant="outline" className="text-xs">{user?.role}</Badge>
                 </div>
                 <Button
-                  onClick={handleLogout}
+                  type="button"
                   variant="outline"
                   size="sm"
                   className="gap-2 h-8 md:h-9"
+                  onClick={() => {
+                    resetPasswordForm();
+                    setChangePasswordOpen(true);
+                  }}
+                  title="Change password"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span className="hidden lg:inline">Change Password</span>
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setLogoutConfirmOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 h-8 md:h-9"
+                  title="Log out"
                 >
                   <LogOut className="h-4 w-4" />
                   <span className="hidden sm:inline">Logout</span>
@@ -374,6 +450,101 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           {children}
         </main>
       </div>
+
+      <Dialog
+        open={changePasswordOpen}
+        onOpenChange={(open) => {
+          setChangePasswordOpen(open);
+          if (!open) resetPasswordForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleChangePasswordSubmit}>
+            <DialogHeader>
+              <DialogTitle>Change password</DialogTitle>
+              <DialogDescription className="space-y-2">
+                <span className="block">
+                  Enter your current password, then choose a new password. This applies to your account only.
+                </span>
+                <span className="block text-xs text-muted-foreground">{PASSWORD_REQUIREMENTS_SUMMARY}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-2">
+              <div className="grid gap-2">
+                <Label htmlFor="current-password">Current password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-password">New password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  aria-invalid={newPassword.length > 0 && newPasswordPolicyErrors.length > 0}
+                />
+                {newPasswordPolicyErrors.length > 0 ? (
+                  <ul className="text-xs text-amber-700 list-disc pl-5 space-y-0.5" role="status">
+                    {newPasswordPolicyErrors.map((msg) => (
+                      <li key={msg}>{msg}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirm-password">Confirm new password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {passwordError ? (
+                <p className="text-sm text-red-600 whitespace-pre-line" role="alert">
+                  {passwordError}
+                </p>
+              ) : null}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setChangePasswordOpen(false)}
+                disabled={passwordSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-red-600 hover:bg-red-700" disabled={passwordSubmitting}>
+                {passwordSubmitting ? 'Updating…' : 'Update password'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        onOpenChange={setLogoutConfirmOpen}
+        title="Log out?"
+        description="You will need to sign in again to use the system."
+        confirmLabel="Log out"
+        cancelLabel="Stay signed in"
+        variant="primary"
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 };

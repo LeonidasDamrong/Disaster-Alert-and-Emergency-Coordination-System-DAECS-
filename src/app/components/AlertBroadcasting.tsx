@@ -8,13 +8,34 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { AlertTriangle, Send, Calendar, XCircle, Loader2, CheckCircle, ClipboardList } from 'lucide-react';
+import { AlertTriangle, Send, Calendar, XCircle, Loader2, CheckCircle, ClipboardList, Pencil } from 'lucide-react';
 import { alertApi, victimReportApi } from '../lib/api';
 import type { Alert as AlertType, AlertType as SeverityType, AlertStatus, VictimReport } from '../lib/types';
 import { toast } from 'sonner';
 import { useIsMobile } from './ui/use-mobile';
 import { useAuth } from '../context/AuthContext';
 import { sortByIdDesc } from '../lib/sort';
+import { ConfirmDialog } from './ConfirmDialog';
+
+function isoToDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Earliest selectable value for datetime-local inputs (user's local clock). */
+function datetimeLocalMinNow(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function isFutureLocalDatetime(isoOrLocal: string): boolean {
+  const t = new Date(isoOrLocal);
+  if (Number.isNaN(t.getTime())) return false;
+  return t.getTime() > Date.now();
+}
 
 const typeShort: Record<string, string> = { Emergency: 'Emerg', Warning: 'Warn', Information: 'Info', 'All Clear': 'Clear' };
 const statusShort: Record<string, string> = { Sent: 'Sent', Scheduled: 'Sched', Canceled: 'Canc' };
@@ -70,18 +91,26 @@ export const AlertBroadcasting = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [reportActionLoading, setReportActionLoading] = useState(false);
 
+  const [createImmediateConfirmOpen, setCreateImmediateConfirmOpen] = useState(false);
+  const [createScheduleConfirmOpen, setCreateScheduleConfirmOpen] = useState(false);
+  const [broadcastNowAlertId, setBroadcastNowAlertId] = useState<string | null>(null);
+  const [cancelScheduledAlertId, setCancelScheduledAlertId] = useState<string | null>(null);
+  const [editScheduledAlert, setEditScheduledAlert] = useState<AlertType | null>(null);
+  const [editScheduledForm, setEditScheduledForm] = useState({
+    title: '',
+    message: '',
+    type: 'Information' as SeverityType,
+    targetAudience: '',
+    scheduledFor: '',
+  });
+  const [editScheduledSaveConfirmOpen, setEditScheduledSaveConfirmOpen] = useState(false);
+  const [editScheduledSubmitting, setEditScheduledSubmitting] = useState(false);
+
   const fetchAlerts = async () => {
     try {
       setLoading(true);
       const data = await alertApi.getAll();
       setAlerts(data.map(a => {
-        // #region agent log
-        const raw = a.scheduledFor ?? a.sentAt ?? a.createdAt;
-        if (raw) {
-          const d = new Date(raw);
-          fetch('http://127.0.0.1:7242/ingest/ea7a769f-3d28-4b8f-a0ad-ba511068bb19',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AlertBroadcasting.tsx:fetchAlerts',message:'datetime display',data:{rawFromApi:raw,displayed:raw ? d.toLocaleString('en-MY') : null,tzOffset:new Date().getTimezoneOffset()},timestamp:Date.now(),hypothesisId:'H3,H4'})}).catch(()=>{});
-        }
-        // #endregion
         return {
           id: a.id,
           title: a.title,
@@ -190,15 +219,25 @@ export const AlertBroadcasting = () => {
     }
   };
 
-  const handleCreateAlert = async (immediate: boolean) => {
-    if (!newAlert.title || !newAlert.message || !newAlert.targetAudience) {
+  const validateCreateFields = (immediate: boolean): boolean => {
+    if (!newAlert.title?.trim() || !newAlert.message?.trim() || !newAlert.targetAudience?.trim()) {
       toast.error('Please fill in Title, Message, and Target Audience');
-      return;
+      return false;
     }
-    if (!immediate && !newAlert.scheduledFor) {
-      toast.error('Please select a date/time for scheduled broadcast');
-      return;
+    if (!immediate) {
+      if (!newAlert.scheduledFor?.trim()) {
+        toast.error('Please select a date/time for scheduled broadcast');
+        return false;
+      }
+      if (!isFutureLocalDatetime(newAlert.scheduledFor)) {
+        toast.error('Scheduled time must be in the future.');
+        return false;
+      }
     }
+    return true;
+  };
+
+  const executeCreateAlert = async (immediate: boolean) => {
     try {
       setIsSubmitting(true);
       await alertApi.create({
@@ -206,43 +245,99 @@ export const AlertBroadcasting = () => {
         message: newAlert.message,
         type: newAlert.type,
         targetAudience: newAlert.targetAudience,
-        scheduledFor: immediate ? null : newAlert.scheduledFor || null
+        scheduledFor: immediate ? null : newAlert.scheduledFor || null,
       });
       setIsCreateDialogOpen(false);
+      setCreateImmediateConfirmOpen(false);
+      setCreateScheduleConfirmOpen(false);
       setNewAlert({
         title: '',
         message: '',
         type: 'Information',
         targetAudience: '',
         scheduled: false,
-        scheduledFor: ''
+        scheduledFor: '',
       });
       toast.success(immediate ? 'Alert broadcast successfully!' : 'Alert scheduled successfully!');
       await fetchAlerts();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create alert');
+      throw err;
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleCancelAlert = async (alertId: string) => {
+  const executeBroadcastNow = async () => {
+    if (!broadcastNowAlertId) return;
     try {
-      await alertApi.cancel(alertId);
-      toast.success('Alert canceled');
-      await fetchAlerts();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to cancel alert');
-    }
-  };
-
-  const handleBroadcastNow = async (alertId: string) => {
-    try {
-      await alertApi.broadcast(alertId);
+      await alertApi.broadcast(broadcastNowAlertId);
       toast.success('Alert broadcast successfully!');
+      setBroadcastNowAlertId(null);
       await fetchAlerts();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to broadcast alert');
+      throw err;
+    }
+  };
+
+  const executeCancelScheduled = async () => {
+    if (!cancelScheduledAlertId) return;
+    try {
+      await alertApi.cancel(cancelScheduledAlertId);
+      toast.success('Scheduled alert canceled');
+      setCancelScheduledAlertId(null);
+      await fetchAlerts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel alert');
+      throw err;
+    }
+  };
+
+  const openEditScheduled = (alert: AlertType) => {
+    setEditScheduledAlert(alert);
+    setEditScheduledForm({
+      title: alert.title,
+      message: alert.message,
+      type: alert.type,
+      targetAudience: alert.targetAudience,
+      scheduledFor: alert.scheduledFor ? isoToDatetimeLocal(alert.scheduledFor) : '',
+    });
+  };
+
+  const executeEditScheduled = async () => {
+    if (!editScheduledAlert) return;
+    if (
+      !editScheduledForm.title.trim() ||
+      !editScheduledForm.message.trim() ||
+      !editScheduledForm.targetAudience.trim() ||
+      !editScheduledForm.scheduledFor
+    ) {
+      toast.error('Title, message, target audience, and scheduled time are required');
+      throw new Error('Validation');
+    }
+    if (!isFutureLocalDatetime(editScheduledForm.scheduledFor)) {
+      toast.error('Scheduled time must be in the future.');
+      throw new Error('Validation');
+    }
+    try {
+      setEditScheduledSubmitting(true);
+      await alertApi.update(editScheduledAlert.id, {
+        title: editScheduledForm.title.trim(),
+        message: editScheduledForm.message.trim(),
+        type: editScheduledForm.type,
+        targetAudience: editScheduledForm.targetAudience.trim(),
+        scheduledFor: editScheduledForm.scheduledFor,
+      });
+      toast.success('Scheduled alert updated');
+      setEditScheduledSaveConfirmOpen(false);
+      setEditScheduledAlert(null);
+      await fetchAlerts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update alert');
+      throw err;
+    } finally {
+      setEditScheduledSubmitting(false);
     }
   };
 
@@ -405,13 +500,18 @@ export const AlertBroadcasting = () => {
                 <Label>Scheduled Broadcast (Optional)</Label>
                 <Input
                   type="datetime-local"
+                  min={datetimeLocalMinNow()}
                   value={newAlert.scheduledFor}
                   onChange={(e) => setNewAlert({ ...newAlert, scheduledFor: e.target.value })}
                 />
               </div>
               <div className="flex gap-3">
                 <Button
-                  onClick={() => handleCreateAlert(true)}
+                  type="button"
+                  onClick={() => {
+                    if (!validateCreateFields(true)) return;
+                    setCreateImmediateConfirmOpen(true);
+                  }}
                   className="flex-1 bg-red-600 hover:bg-red-700 gap-2"
                   disabled={!newAlert.title || !newAlert.message || !newAlert.targetAudience || isSubmitting}
                 >
@@ -419,7 +519,11 @@ export const AlertBroadcasting = () => {
                   Broadcast Immediately
                 </Button>
                 <Button
-                  onClick={() => handleCreateAlert(false)}
+                  type="button"
+                  onClick={() => {
+                    if (!validateCreateFields(false)) return;
+                    setCreateScheduleConfirmOpen(true);
+                  }}
                   variant="outline"
                   className="flex-1 gap-2"
                   disabled={!newAlert.title || !newAlert.message || !newAlert.targetAudience || !newAlert.scheduledFor || isSubmitting}
@@ -544,7 +648,12 @@ export const AlertBroadcasting = () => {
             </div>
             <div className="space-y-2">
               <Label>Schedule broadcast (optional)</Label>
-              <Input type="datetime-local" value={approveForm.scheduledFor} onChange={(e) => setApproveForm({ ...approveForm, scheduledFor: e.target.value })} />
+              <Input
+                type="datetime-local"
+                min={datetimeLocalMinNow()}
+                value={approveForm.scheduledFor}
+                onChange={(e) => setApproveForm({ ...approveForm, scheduledFor: e.target.value })}
+              />
             </div>
             <div className="flex gap-2 justify-end pt-2">
               <Button variant="outline" onClick={() => setApproveReport(null)} disabled={reportActionLoading}>Cancel</Button>
@@ -676,23 +785,40 @@ export const AlertBroadcasting = () => {
                           {alert.status === 'Scheduled' && (
                             <div className="flex gap-1 flex-wrap">
                               <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-1 text-xs h-7 px-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditScheduled(alert);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                                <span className="hidden sm:inline">Edit</span>
+                              </Button>
+                              <Button
+                                type="button"
                                 variant="default"
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 gap-1 text-xs h-7 px-2"
-                                onClick={() => handleBroadcastNow(alert.id)}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClickCapture={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBroadcastNowAlertId(alert.id);
+                                }}
                               >
                                 <Send className="h-3 w-3" />
                                 Now
                               </Button>
                               <Button
+                                type="button"
                                 variant="ghost"
                                 size="sm"
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs h-7 px-2"
-                                onClick={() => handleCancelAlert(alert.id)}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClickCapture={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCancelScheduledAlertId(alert.id);
+                                }}
                               >
                                 <XCircle className="h-3 w-3" />
                                 <span className="hidden sm:inline">Cancel</span>
@@ -709,6 +835,182 @@ export const AlertBroadcasting = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!editScheduledAlert}
+        onOpenChange={(o) => {
+          if (!o && !editScheduledSubmitting) {
+            setEditScheduledAlert(null);
+            setEditScheduledSaveConfirmOpen(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit scheduled alert</DialogTitle>
+            <DialogDescription>
+              Update content or schedule before it is broadcast. Sent alerts cannot be edited here.
+            </DialogDescription>
+          </DialogHeader>
+          {editScheduledAlert && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Alert title *</Label>
+                <Input
+                  value={editScheduledForm.title}
+                  onChange={(e) => setEditScheduledForm((f) => ({ ...f, title: e.target.value }))}
+                  disabled={editScheduledSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Alert message *</Label>
+                <Textarea
+                  rows={5}
+                  value={editScheduledForm.message}
+                  onChange={(e) => setEditScheduledForm((f) => ({ ...f, message: e.target.value }))}
+                  disabled={editScheduledSubmitting}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Alert type *</Label>
+                  <Select
+                    value={editScheduledForm.type}
+                    onValueChange={(v) => setEditScheduledForm((f) => ({ ...f, type: v as SeverityType }))}
+                    disabled={editScheduledSubmitting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Emergency">Emergency</SelectItem>
+                      <SelectItem value="Warning">Warning</SelectItem>
+                      <SelectItem value="Information">Information</SelectItem>
+                      <SelectItem value="All Clear">All Clear</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Target audience *</Label>
+                  <Input
+                    value={editScheduledForm.targetAudience}
+                    onChange={(e) => setEditScheduledForm((f) => ({ ...f, targetAudience: e.target.value }))}
+                    disabled={editScheduledSubmitting}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Scheduled for *</Label>
+                <Input
+                  type="datetime-local"
+                  min={datetimeLocalMinNow()}
+                  value={editScheduledForm.scheduledFor}
+                  onChange={(e) => setEditScheduledForm((f) => ({ ...f, scheduledFor: e.target.value }))}
+                  disabled={editScheduledSubmitting}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditScheduledAlert(null)}
+                  disabled={editScheduledSubmitting}
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-orange-600 hover:bg-orange-700"
+                  onClick={() => setEditScheduledSaveConfirmOpen(true)}
+                  disabled={editScheduledSubmitting}
+                >
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={createImmediateConfirmOpen}
+        onOpenChange={setCreateImmediateConfirmOpen}
+        title="Broadcast this alert immediately?"
+        description={
+          <span>
+            Subscribers will receive “<strong>{newAlert.title.trim() || 'this alert'}</strong>” right away.
+          </span>
+        }
+        confirmLabel="Broadcast now"
+        variant="primary"
+        onConfirm={() => executeCreateAlert(true)}
+      />
+
+      <ConfirmDialog
+        open={createScheduleConfirmOpen}
+        onOpenChange={setCreateScheduleConfirmOpen}
+        title="Schedule this alert?"
+        description={
+          <span>
+            “<strong>{newAlert.title.trim() || 'This alert'}</strong>” will be sent at{' '}
+            <strong>
+              {newAlert.scheduledFor
+                ? new Date(newAlert.scheduledFor).toLocaleString('en-MY')
+                : '—'}
+            </strong>{' '}
+            (local time).
+          </span>
+        }
+        confirmLabel="Schedule"
+        variant="primary"
+        onConfirm={() => executeCreateAlert(false)}
+      />
+
+      <ConfirmDialog
+        open={!!broadcastNowAlertId}
+        onOpenChange={(o) => !o && setBroadcastNowAlertId(null)}
+        title="Send this scheduled alert now?"
+        description={
+          broadcastNowAlertId ? (
+            <span>
+              Broadcast “
+              <strong>{alerts.find((a) => a.id === broadcastNowAlertId)?.title ?? 'this alert'}</strong>”
+              immediately? The planned send time will be skipped.
+            </span>
+          ) : null
+        }
+        confirmLabel="Broadcast now"
+        variant="primary"
+        onConfirm={executeBroadcastNow}
+      />
+
+      <ConfirmDialog
+        open={!!cancelScheduledAlertId}
+        onOpenChange={(o) => !o && setCancelScheduledAlertId(null)}
+        title="Cancel this scheduled alert?"
+        description={
+          cancelScheduledAlertId ? (
+            <span>
+              “
+              <strong>{alerts.find((a) => a.id === cancelScheduledAlertId)?.title ?? 'This alert'}</strong>”
+              will not be sent. It will be marked as canceled.
+            </span>
+          ) : null
+        }
+        confirmLabel="Yes, cancel"
+        variant="destructive"
+        onConfirm={executeCancelScheduled}
+      />
+
+      <ConfirmDialog
+        open={editScheduledSaveConfirmOpen}
+        onOpenChange={setEditScheduledSaveConfirmOpen}
+        title="Save changes to this scheduled alert?"
+        description="The updated title, message, audience, and schedule time will replace what is stored for this alert."
+        confirmLabel="Save changes"
+        variant="primary"
+        onConfirm={executeEditScheduled}
+      />
     </div>
   );
 };

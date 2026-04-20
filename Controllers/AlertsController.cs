@@ -33,6 +33,19 @@ namespace FYP_Project_II.Controllers
         private static string? ToUtcIso(DateTime? dt) =>
             dt.HasValue ? dt.Value.Kind == DateTimeKind.Utc ? dt.Value.ToString("yyyy-MM-ddTHH:mm:ss.fffZ") : DateTime.SpecifyKind(dt.Value, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ss.fffZ") : null;
 
+        /// <summary>
+        /// JSON dates may be UTC, local, or unspecified — normalize before comparing/storing as UTC.
+        /// </summary>
+        private static DateTime ToUtcComparable(DateTime dt)
+        {
+            return dt.Kind switch
+            {
+                DateTimeKind.Utc => dt,
+                DateTimeKind.Local => dt.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc)
+            };
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetAlerts()
         {
@@ -79,19 +92,6 @@ namespace FYP_Project_II.Controllers
         [HttpPost]
         public async Task<ActionResult<object>> CreateAlert([FromBody] CreateAlertRequest request)
         {
-            // #region agent log
-            try
-            {
-                var logPath = Path.Combine(Directory.GetCurrentDirectory(), ".cursor", "debug.log");
-                var logDir = Path.GetDirectoryName(logPath);
-                if (!string.IsNullOrEmpty(logDir)) Directory.CreateDirectory(logDir);
-                var received = request.ScheduledFor;
-                var logLine = System.Text.Json.JsonSerializer.Serialize(new { location = "AlertsController.CreateAlert", message = "scheduledFor received", data = new { received = received?.ToString("O"), kind = received?.Kind.ToString(), utcNow = DateTime.UtcNow.ToString("O") }, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), hypothesisId = "H2" }) + "\n";
-                await System.IO.File.AppendAllTextAsync(logPath, logLine);
-            }
-            catch { }
-            // #endregion
-
             if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Message) || string.IsNullOrWhiteSpace(request.TargetAudience))
             {
                 return BadRequest(new { message = "Title, Message, and Target Audience are required." });
@@ -119,8 +119,25 @@ namespace FYP_Project_II.Controllers
 
             var createdBy = await GetCurrentUserNameAsync();
             var now = DateTime.UtcNow;
-            var isScheduled = request.ScheduledFor.HasValue && request.ScheduledFor.Value > now;
-            var status = isScheduled ? "Scheduled" : "Sent";
+
+            string status;
+            DateTime? scheduledForUtc = null;
+            DateTime? sentAt = null;
+
+            if (request.ScheduledFor.HasValue)
+            {
+                scheduledForUtc = ToUtcComparable(request.ScheduledFor.Value);
+                if (scheduledForUtc.Value <= now)
+                {
+                    return BadRequest(new { message = "Scheduled time must be in the future." });
+                }
+                status = "Scheduled";
+            }
+            else
+            {
+                status = "Sent";
+                sentAt = now;
+            }
 
             var alert = new Alert
             {
@@ -131,8 +148,8 @@ namespace FYP_Project_II.Controllers
                 Status = status,
                 TargetAudience = request.TargetAudience.Trim(),
                 CreatedBy = createdBy,
-                ScheduledFor = isScheduled ? request.ScheduledFor : null,
-                SentAt = isScheduled ? null : now,
+                ScheduledFor = scheduledForUtc,
+                SentAt = sentAt,
                 CreatedAt = now,
                 UpdatedAt = now
             };
@@ -183,6 +200,11 @@ namespace FYP_Project_II.Controllers
                 return BadRequest(new { message = "Cannot update an alert that has already been sent." });
             }
 
+            if (alert.Status == "Canceled")
+            {
+                return BadRequest(new { message = "Cannot update a canceled alert." });
+            }
+
             if (!string.IsNullOrWhiteSpace(request.Title))
                 alert.Title = request.Title.Trim();
             if (!string.IsNullOrWhiteSpace(request.Message))
@@ -196,7 +218,14 @@ namespace FYP_Project_II.Controllers
             if (!string.IsNullOrWhiteSpace(request.TargetAudience))
                 alert.TargetAudience = request.TargetAudience.Trim();
             if (request.ScheduledFor.HasValue)
-                alert.ScheduledFor = request.ScheduledFor;
+            {
+                var scheduledUtc = ToUtcComparable(request.ScheduledFor.Value);
+                if (scheduledUtc <= DateTime.UtcNow)
+                {
+                    return BadRequest(new { message = "Scheduled time must be in the future." });
+                }
+                alert.ScheduledFor = scheduledUtc;
+            }
 
             alert.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();

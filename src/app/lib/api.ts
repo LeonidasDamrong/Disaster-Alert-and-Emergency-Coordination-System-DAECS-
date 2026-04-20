@@ -5,6 +5,22 @@ const API_BASE_URL = import.meta.env.MODE === 'production'
 
 import type { UserRole, SystemSettings, Announcement, Shelter, ShelterApi, Evacuee, EvacueeApi, ShelterResourceApi, ShelterReportApi, ShelterRegistrationRequestApi, SOS, SOSStatus, UrgencyLevel, CaseNote, VictimReport } from './types';
 
+function parseApiErrorMessage(error: { message?: string; errors?: string[] } | null, status: number): string {
+    if (status === 401) {
+        return 'Session expired. Please log in again.';
+    }
+    const list = Array.isArray(error?.errors) ? error!.errors!.filter((e) => e && e.trim()) : [];
+    if (list.length === 1) {
+        return list[0];
+    }
+    if (list.length > 1) {
+        const headline = error?.message?.trim();
+        const bullets = list.map((line) => `• ${line}`);
+        return headline ? `${headline}\n\n${bullets.join('\n')}` : bullets.join('\n');
+    }
+    return error?.message?.trim() || `Request failed (${status})`;
+}
+
 // API Client with JWT token support
 class ApiClient {
     private getAuthHeader(): HeadersInit {
@@ -31,8 +47,11 @@ class ApiClient {
             const response = await fetch(url, config);
 
             if (!response.ok) {
-                const error = await response.json().catch(() => null);
-                const message = error?.message ?? (response.status === 401 ? 'Session expired. Please log in again.' : `Request failed (${response.status})`);
+                const error = await response.json().catch(() => null) as {
+                    message?: string;
+                    errors?: string[];
+                } | null;
+                const message = parseApiErrorMessage(error, response.status);
                 throw new Error(message);
             }
 
@@ -128,6 +147,12 @@ export const authApi = {
         apiClient.delete<{ message: string }>(`/api/account/users/${encodeURIComponent(userId)}`),
 
     logout: () => apiClient.post<{ message: string }>('/api/account/logout'),
+
+    changePassword: (currentPassword: string, newPassword: string) =>
+        apiClient.post<{ message: string }>('/api/account/change-password', {
+            currentPassword,
+            newPassword,
+        }),
 };
 
 export const auditLogApi = {
@@ -185,11 +210,11 @@ export const alertApi = {
         }>(`/api/alerts/${encodeURIComponent(id)}`),
 
     create: (data: { title: string; message: string; type: string; targetAudience: string; scheduledFor?: string | null }) => {
-        // #region agent log
         const rawScheduledFor = data.scheduledFor;
-        const isoForApi = rawScheduledFor ? new Date(rawScheduledFor).toISOString() : null;
-        fetch('http://127.0.0.1:7242/ingest/ea7a769f-3d28-4b8f-a0ad-ba511068bb19',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:alertApi.create',message:'scheduledFor conversion',data:{rawScheduledFor,isoForApi,userTzOffset:new Date().getTimezoneOffset(),nowIso:new Date().toISOString()},timestamp:Date.now(),hypothesisId:'H1,H5'})}).catch(()=>{});
-        // #endregion
+        const isoForApi =
+            rawScheduledFor != null && String(rawScheduledFor).trim() !== ''
+                ? new Date(rawScheduledFor).toISOString()
+                : null;
         return apiClient.post<{
             id: string;
             title: string;
@@ -210,11 +235,17 @@ export const alertApi = {
         });
     },
 
-    update: (id: string, data: { title?: string; message?: string; type?: string; targetAudience?: string; scheduledFor?: string | null }) =>
-        apiClient.put<void>(`/api/alerts/${encodeURIComponent(id)}`, {
-            ...data,
-            scheduledFor: data.scheduledFor ? new Date(data.scheduledFor).toISOString() : data.scheduledFor
-        }),
+    update: (id: string, data: { title?: string; message?: string; type?: string; targetAudience?: string; scheduledFor?: string | null }) => {
+        const { scheduledFor, ...rest } = data;
+        const body: Record<string, unknown> = { ...rest };
+        if (scheduledFor !== undefined) {
+            body.scheduledFor =
+                scheduledFor != null && String(scheduledFor).trim() !== ''
+                    ? new Date(scheduledFor).toISOString()
+                    : null;
+        }
+        return apiClient.put<void>(`/api/alerts/${encodeURIComponent(id)}`, body);
+    },
 
     delete: (id: string) =>
         apiClient.delete<void>(`/api/alerts/${encodeURIComponent(id)}`),

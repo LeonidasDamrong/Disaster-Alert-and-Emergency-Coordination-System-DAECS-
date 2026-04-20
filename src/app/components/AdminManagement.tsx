@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -16,8 +16,41 @@ import { authApi, auditLogApi, systemSettingsApi, announcementApi } from '../lib
 import { useAuth } from '../context/AuthContext';
 import { useIsMobile } from './ui/use-mobile';
 import { sortByIdDesc } from '../lib/sort';
+import { ConfirmDialog } from './ConfirmDialog';
+import {
+  hasAdminUserFieldErrors,
+  validateCreateUserInput,
+  validateEditUserInput,
+} from '../lib/adminUserValidation';
+import { PASSWORD_HINT_SHORT } from '../lib/passwordPolicy';
 
 const getShortName = (s: string) => (s && s.split(' - ')[0]) || s || '';
+
+/** Keeps Malaysia +60 prefix and digits-only after prefix (same as create form). */
+function normalizeMalaysiaPhoneInput(prevPhone: string, raw: string): string {
+  if (raw === '+6') return '+60';
+  if (!raw.startsWith('+60')) return prevPhone;
+  const numPart = raw.slice(3);
+  if (/^\d*$/.test(numPart)) return raw;
+  return prevPhone;
+}
+
+/** Snapshot of editable fields when “Edit” was opened — used to detect real changes. */
+type EditableUserFields = { name: string; email: string; phone: string };
+
+function normalizeUserFieldsForCompare(f: EditableUserFields): EditableUserFields {
+  return {
+    name: f.name.trim(),
+    email: f.email.trim().toLowerCase(),
+    phone: f.phone.trim(),
+  };
+}
+
+function editableUserFieldsEqual(a: EditableUserFields, b: EditableUserFields): boolean {
+  const x = normalizeUserFieldsForCompare(a);
+  const y = normalizeUserFieldsForCompare(b);
+  return x.name === y.name && x.email === y.email && x.phone === y.phone;
+}
 
 export const AdminManagement = () => {
   const { user: currentUser } = useAuth();
@@ -37,6 +70,8 @@ export const AdminManagement = () => {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  /** Values when the edit dialog was opened (before any edits). */
+  const [editUserBaseline, setEditUserBaseline] = useState<EditableUserFields | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
   const [newUser, setNewUser] = useState({
     userId: '',
@@ -56,6 +91,13 @@ export const AdminManagement = () => {
 
   const [deleteUserDialog, setDeleteUserDialog] = useState<User | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  const [createUserConfirmOpen, setCreateUserConfirmOpen] = useState(false);
+  const [updateUserConfirmOpen, setUpdateUserConfirmOpen] = useState(false);
+  const [saveSettingsConfirmOpen, setSaveSettingsConfirmOpen] = useState(false);
+  const [createAnnouncementFormOpen, setCreateAnnouncementFormOpen] = useState(false);
+  const [announcementPublishConfirmOpen, setAnnouncementPublishConfirmOpen] = useState(false);
+  const [announcementPendingDelete, setAnnouncementPendingDelete] = useState<Announcement | null>(null);
 
   // Fetch users, roles, audit logs, and settings
   useEffect(() => {
@@ -136,11 +178,55 @@ export const AdminManagement = () => {
     }
   }, [isDialogOpen, newUser.role]);
 
-  const handleCreateUser = async () => {
+  const hasEditingUserChanges = useMemo(() => {
+    if (!editingUser || !editUserBaseline) return false;
+    return !editableUserFieldsEqual(
+      { name: editingUser.name, email: editingUser.email, phone: editingUser.phone },
+      editUserBaseline
+    );
+  }, [editingUser, editUserBaseline]);
+
+  const createUserFieldErrors = useMemo(
+    () =>
+      validateCreateUserInput({
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        password: newUser.password,
+      }),
+    [newUser.name, newUser.email, newUser.phone, newUser.password],
+  );
+
+  const editUserFieldErrors = useMemo(() => {
+    if (!editingUser) return {};
+    return validateEditUserInput({
+      name: editingUser.name,
+      email: editingUser.email,
+      phone: editingUser.phone,
+    });
+  }, [editingUser]);
+
+  const createUserFormValid = Boolean(
+    newUser.userId && !hasAdminUserFieldErrors(createUserFieldErrors),
+  );
+
+  const editUserFormValid = !hasAdminUserFieldErrors(editUserFieldErrors);
+
+  const performCreateUser = async () => {
+    const v = validateCreateUserInput({
+      name: newUser.name,
+      email: newUser.email,
+      phone: newUser.phone,
+      password: newUser.password,
+    });
+    if (hasAdminUserFieldErrors(v)) {
+      toast.error(v.name ?? v.email ?? v.phone ?? v.password ?? 'Please fix the highlighted fields.');
+      throw new Error('Validation failed');
+    }
+
     setIsCreatingUser(true);
 
     try {
-      // Call the backend API to create user
       await authApi.register({
         userId: newUser.userId,
         password: newUser.password,
@@ -150,11 +236,9 @@ export const AdminManagement = () => {
         role: newUser.role
       });
 
-      // Only refresh if registration succeeded
       const updatedUsers = await authApi.getAllUsers();
       setUsers(updatedUsers);
 
-      // Reset form
       setNewUser({
         userId: '',
         password: '',
@@ -164,36 +248,60 @@ export const AdminManagement = () => {
         phone: '+60'
       });
 
-      // Close dialog and show success message
       setIsDialogOpen(false);
+      setCreateUserConfirmOpen(false);
       toast.success('User created successfully and saved to database');
 
-      // Refresh audit logs
       const updatedAuditLogs = await auditLogApi.getAuditLogs();
       setAuditLogs(updatedAuditLogs);
-
     } catch (error) {
-      // Handle errors - DO NOT refresh user list on error
       let errorMessage = 'Failed to create user';
 
       if (error instanceof Error) {
         errorMessage = error.message;
 
-        // Provide helpful hints for common errors
         if (errorMessage.includes('password') || errorMessage.includes('Password')) {
-          errorMessage += '\n\nPassword must have:\n• At least 6 characters\n• Uppercase letter (A-Z)\n• Lowercase letter (a-z)\n• Number (0-9)';
+          errorMessage +=
+            '\n\nPassword must have:\n• At least 6 characters\n• Uppercase letter (A-Z)\n• Lowercase letter (a-z)\n• Number (0-9)\n• Special character (e.g. ! @ # $)';
         }
       }
 
       toast.error(errorMessage);
       console.error('Error creating user:', error);
+      throw error;
     } finally {
       setIsCreatingUser(false);
     }
   };
 
-  const handleUpdateUser = async () => {
-    if (!editingUser) return;
+  const performUpdateUser = async () => {
+    if (!editingUser) {
+      throw new Error('No user to update');
+    }
+    if (!editUserBaseline) {
+      toast.error('Edit session expired. Close and open edit again.');
+      throw new Error('No baseline');
+    }
+    if (
+      editableUserFieldsEqual(
+        { name: editingUser.name, email: editingUser.email, phone: editingUser.phone },
+        editUserBaseline
+      )
+    ) {
+      toast.info('No changes to save. Name, email, and phone are unchanged.');
+      throw new Error('No changes');
+    }
+
+    const fieldErr = validateEditUserInput({
+      name: editingUser.name,
+      email: editingUser.email,
+      phone: editingUser.phone,
+    });
+    if (hasAdminUserFieldErrors(fieldErr)) {
+      toast.error(fieldErr.name ?? fieldErr.email ?? fieldErr.phone ?? 'Please fix the highlighted fields.');
+      throw new Error('Validation failed');
+    }
+
     setIsEditingUser(true);
     try {
       await authApi.updateUser(editingUser.userId, {
@@ -204,8 +312,9 @@ export const AdminManagement = () => {
       const updatedUsers = await authApi.getAllUsers();
       setUsers(updatedUsers);
       setEditingUser(null);
+      setEditUserBaseline(null);
+      setUpdateUserConfirmOpen(false);
 
-      // Refresh audit logs
       const updatedAuditLogs = await auditLogApi.getAuditLogs();
       setAuditLogs(updatedAuditLogs);
 
@@ -213,6 +322,7 @@ export const AdminManagement = () => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update user';
       toast.error(errorMessage);
+      throw error;
     } finally {
       setIsEditingUser(false);
     }
@@ -223,24 +333,30 @@ export const AdminManagement = () => {
     setDeleteConfirmation('');
   };
 
-  const confirmDeleteUser = async () => {
-    if (!deleteUserDialog) return;
-    if (deleteConfirmation !== deleteUserDialog.userId) return;
+  const performDeleteUser = async () => {
+    if (!deleteUserDialog) {
+      throw new Error('No user selected');
+    }
+    if (deleteConfirmation !== deleteUserDialog.userId) {
+      toast.error('Type the User ID exactly as shown to confirm deletion.');
+      throw new Error('Confirmation mismatch');
+    }
 
     try {
       await authApi.deleteUser(deleteUserDialog.userId);
       const updatedUsers = await authApi.getAllUsers();
       setUsers(updatedUsers);
 
-      // Refresh audit logs
       const updatedAuditLogs = await auditLogApi.getAuditLogs();
       setAuditLogs(updatedAuditLogs);
 
       toast.success('User deleted successfully');
       setDeleteUserDialog(null);
+      setDeleteConfirmation('');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
       toast.error(errorMessage);
+      throw error;
     }
   };
 
@@ -249,19 +365,64 @@ export const AdminManagement = () => {
     setIsEditingSettings(true);
   };
 
-  const handleSaveSettings = async () => {
+  const performSaveSettings = async () => {
     try {
       await systemSettingsApi.updateSettings(tempSettings);
       setSystemSettings(tempSettings);
       setIsEditingSettings(false);
-
-      // Add audit log
-      // In a real app the backend would handle audit logging for this action.
+      setSaveSettingsConfirmOpen(false);
 
       toast.success('System settings updated');
     } catch (error) {
       console.error('Error saving settings:', error);
       toast.error('Failed to save settings');
+      throw error;
+    }
+  };
+
+  const performPublishAnnouncement = async () => {
+    try {
+      const announcementData = {
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
+        priority: newAnnouncement.priority,
+        isActive: true,
+        expiresAt: newAnnouncement.expiresAt ? new Date(newAnnouncement.expiresAt).toISOString() : undefined,
+      };
+
+      await announcementApi.create(announcementData as Partial<Announcement>);
+      toast.success('Announcement published');
+      const data = await announcementApi.getAll();
+      setAnnouncements(data);
+      setNewAnnouncement({
+        title: '',
+        content: '',
+        priority: 'Low',
+        expiresAt: '',
+      });
+      setAnnouncementPublishConfirmOpen(false);
+      setCreateAnnouncementFormOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create announcement');
+      throw error;
+    }
+  };
+
+  const performDeleteAnnouncement = async () => {
+    if (!announcementPendingDelete) {
+      throw new Error('No announcement selected');
+    }
+    try {
+      await announcementApi.delete(announcementPendingDelete.id);
+      toast.success('Announcement deleted');
+      const data = await announcementApi.getAll();
+      setAnnouncements(data);
+      setAnnouncementPendingDelete(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete');
+      throw err;
     }
   };
 
@@ -361,11 +522,13 @@ export const AdminManagement = () => {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Create New User</DialogTitle>
-                      <DialogDescription>Add a new user to the system</DialogDescription>
+                      <DialogDescription>
+                        Add account details. User ID and email are generated from the role you pick.
+                      </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="space-y-1.5">
                           <Label>User ID *</Label>
                           <Input
                             value={newUser.userId}
@@ -373,32 +536,40 @@ export const AdminManagement = () => {
                             disabled
                             className="bg-gray-50"
                           />
-                          <p className="text-xs text-gray-500">Auto-generated based on selected role</p>
+                          <p className="text-xs text-muted-foreground">From role</p>
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <Label>Password *</Label>
                           <Input
                             type="password"
                             value={newUser.password}
                             onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                            placeholder="********"
+                            placeholder="Enter password"
                             disabled={isCreatingUser}
+                            aria-invalid={!!createUserFieldErrors.password}
                           />
-                          <p className="text-xs text-gray-500">
-                            Min 6 chars, must include uppercase, lowercase, and number
-                          </p>
+                          {createUserFieldErrors.password ? (
+                            <p className="text-xs text-red-600">{createUserFieldErrors.password}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">{PASSWORD_HINT_SHORT}</p>
+                          )}
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Full Name *</Label>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="create-user-name">Full Name *</Label>
                         <Input
+                          id="create-user-name"
                           value={newUser.name}
                           onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                           placeholder="Enter full name"
                           disabled={isCreatingUser}
+                          aria-invalid={!!createUserFieldErrors.name}
                         />
+                        {createUserFieldErrors.name ? (
+                          <p className="text-xs text-red-600">{createUserFieldErrors.name}</p>
+                        ) : null}
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <Label>Role *</Label>
                         <Select
                           value={newUser.role}
@@ -417,44 +588,59 @@ export const AdminManagement = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Email *</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="create-user-email">Email *</Label>
                           <Input
+                            id="create-user-email"
                             type="email"
                             value={newUser.email}
                             onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                             placeholder="email@daecs.gov.my"
                             disabled={isCreatingUser}
+                            autoComplete="off"
+                            aria-invalid={!!createUserFieldErrors.email}
                           />
+                          {createUserFieldErrors.email ? (
+                            <p className="text-xs text-red-600">{createUserFieldErrors.email}</p>
+                          ) : null}
                         </div>
-                        <div className="space-y-2">
-                          <Label>Phone *</Label>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="create-user-phone">Phone *</Label>
                           <Input
+                            id="create-user-phone"
                             value={newUser.phone}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === '+6') {
-                                setNewUser({ ...newUser, phone: '+60' });
-                                return;
-                              }
-                              if (!val.startsWith('+60')) return;
-                              const numPart = val.substring(3);
-                              if (/^\d*$/.test(numPart)) {
-                                setNewUser({ ...newUser, phone: val });
-                              }
-                            }}
-                            placeholder="+60..."
+                            onChange={(e) =>
+                              setNewUser((prev) => ({
+                                ...prev,
+                                phone: normalizeMalaysiaPhoneInput(prev.phone, e.target.value),
+                              }))
+                            }
+                            placeholder="+60123456789"
                             disabled={isCreatingUser}
+                            inputMode="tel"
+                            aria-invalid={!!createUserFieldErrors.phone}
                           />
+                          {createUserFieldErrors.phone ? (
+                            <p className="text-xs text-red-600">{createUserFieldErrors.phone}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">+60 then 8–11 digits</p>
+                          )}
                         </div>
                       </div>
                       <Button
-                        onClick={handleCreateUser}
+                        type="button"
+                        onClick={() => {
+                          if (!createUserFormValid) {
+                            toast.error('Please fix the highlighted fields before continuing.');
+                            return;
+                          }
+                          setCreateUserConfirmOpen(true);
+                        }}
                         className="w-full"
-                        disabled={!newUser.userId || !newUser.password || !newUser.name || !newUser.email || !newUser.phone || isCreatingUser}
+                        disabled={!createUserFormValid || isCreatingUser}
                       >
-                        {isCreatingUser ? 'Creating User...' : 'Create User Account'}
+                        Create User Account
                       </Button>
                     </div>
                   </DialogContent>
@@ -469,7 +655,15 @@ export const AdminManagement = () => {
               ) : (
                 <>
                   {/* Edit User Dialog */}
-                  <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+                  <Dialog
+                    open={!!editingUser}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        setEditingUser(null);
+                        setEditUserBaseline(null);
+                      }
+                    }}
+                  >
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Edit User</DialogTitle>
@@ -482,82 +676,86 @@ export const AdminManagement = () => {
                             <Input value={editingUser.userId} disabled className="bg-gray-50" />
                           </div>
                           <div className="space-y-2">
-                            <Label>Full Name *</Label>
+                            <Label htmlFor="edit-user-name">Full Name *</Label>
                             <Input
+                              id="edit-user-name"
                               value={editingUser.name}
                               onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
                               placeholder="Enter full name"
                               disabled={isEditingUser}
+                              aria-invalid={!!editUserFieldErrors.name}
                             />
+                            {editUserFieldErrors.name ? (
+                              <p className="text-xs text-red-600">{editUserFieldErrors.name}</p>
+                            ) : null}
                           </div>
                           <div className="space-y-2">
-                            <Label>Email *</Label>
+                            <Label htmlFor="edit-user-email">Email *</Label>
                             <Input
+                              id="edit-user-email"
                               type="email"
                               value={editingUser.email}
                               onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
                               placeholder="email@daecs.gov.my"
                               disabled={isEditingUser}
+                              aria-invalid={!!editUserFieldErrors.email}
                             />
+                            {editUserFieldErrors.email ? (
+                              <p className="text-xs text-red-600">{editUserFieldErrors.email}</p>
+                            ) : null}
                           </div>
                           <div className="space-y-2">
-                            <Label>Phone *</Label>
+                            <Label htmlFor="edit-user-phone">Phone *</Label>
                             <Input
+                              id="edit-user-phone"
                               value={editingUser.phone}
                               onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                              placeholder="+60..."
+                              placeholder="+60123456789"
                               disabled={isEditingUser}
+                              inputMode="tel"
+                              aria-invalid={!!editUserFieldErrors.phone}
                             />
+                            {editUserFieldErrors.phone ? (
+                              <p className="text-xs text-red-600">{editUserFieldErrors.phone}</p>
+                            ) : (
+                              <p className="text-xs text-gray-500">Malaysia format: +60 and 8–11 digits.</p>
+                            )}
                           </div>
                           <Button
-                            onClick={handleUpdateUser}
+                            type="button"
+                            onClick={() => {
+                              if (!hasEditingUserChanges) {
+                                toast.info('No changes to save. Edit name, email, or phone before updating.');
+                                return;
+                              }
+                              if (!editUserFormValid) {
+                                toast.error('Please fix the highlighted fields before updating.');
+                                return;
+                              }
+                              setUpdateUserConfirmOpen(true);
+                            }}
                             className="w-full"
-                            disabled={!editingUser.name || !editingUser.email || !editingUser.phone || isEditingUser}
+                            disabled={
+                              isEditingUser ||
+                              !hasEditingUserChanges ||
+                              !editUserFormValid
+                            }
                           >
-                            {isEditingUser ? 'Updating...' : 'Update User'}
+                            Update User
                           </Button>
+                          {editUserBaseline &&
+                          editingUser.name &&
+                          editingUser.email &&
+                          editingUser.phone &&
+                          !hasEditingUserChanges ? (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Change name, email, or phone to something different from the current values to update.
+                            </p>
+                          ) : null}
                         </div>
                       )}
                     </DialogContent>
                   </Dialog>
-                  {/* Delete User Confirmation Dialog */}
-                  <Dialog open={!!deleteUserDialog} onOpenChange={(open) => !open && setDeleteUserDialog(null)}>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Delete User</DialogTitle>
-                        <DialogDescription>
-                          This action cannot be undone. This will permanently delete the user account.
-                        </DialogDescription>
-                      </DialogHeader>
-                      {deleteUserDialog && (
-                        <div className="space-y-4 py-2">
-                          <div className="p-3 bg-red-50 text-red-800 rounded-md text-sm">
-                            You are about to delete user <strong>{deleteUserDialog.name}</strong> ({deleteUserDialog.userId}).
-                          </div>
-                          <div className="space-y-2">
-                            <Label>To confirm, type <span className="font-mono font-bold select-all">{deleteUserDialog.userId}</span> below:</Label>
-                            <Input
-                              value={deleteConfirmation}
-                              onChange={(e) => setDeleteConfirmation(e.target.value)}
-                              placeholder={deleteUserDialog.userId}
-                              className="font-mono"
-                            />
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setDeleteUserDialog(null)}>Cancel</Button>
-                            <Button
-                              variant="destructive"
-                              disabled={deleteConfirmation !== deleteUserDialog.userId}
-                              onClick={confirmDeleteUser}
-                            >
-                              Delete User
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
-
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -591,7 +789,14 @@ export const AdminManagement = () => {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setEditingUser({ ...user })}
+                                    onClick={() => {
+                                      setEditingUser({ ...user });
+                                      setEditUserBaseline({
+                                        name: user.name ?? '',
+                                        email: user.email ?? '',
+                                        phone: user.phone ?? '',
+                                      });
+                                    }}
                                     className="h-8 w-8 p-0"
                                   >
                                     <Pencil className="h-4 w-4" />
@@ -683,7 +888,12 @@ export const AdminManagement = () => {
                       <X className="h-4 w-4" />
                       Cancel
                     </Button>
-                    <Button onClick={handleSaveSettings} size="sm" className="gap-2 bg-green-600 hover:bg-green-700">
+                    <Button
+                      type="button"
+                      onClick={() => setSaveSettingsConfirmOpen(true)}
+                      size="sm"
+                      className="gap-2 bg-green-600 hover:bg-green-700"
+                    >
                       <Save className="h-4 w-4" />
                       {isMobile ? 'Save' : 'Save Changes'}
                     </Button>
@@ -751,9 +961,9 @@ export const AdminManagement = () => {
                   <CardTitle>System Announcements</CardTitle>
                   <CardDescription>Manage system-wide announcements</CardDescription>
                 </div>
-                <Dialog>
+                <Dialog open={createAnnouncementFormOpen} onOpenChange={setCreateAnnouncementFormOpen}>
                   <DialogTrigger asChild>
-                    <Button className="gap-2">
+                    <Button type="button" className="gap-2">
                       <Plus className="h-4 w-4" />
                       Create Announcement
                     </Button>
@@ -763,34 +973,10 @@ export const AdminManagement = () => {
                       <DialogTitle>Create Announcement</DialogTitle>
                       <DialogDescription>Broadcast a new message to all users</DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={async (e) => {
-                      e.preventDefault();
-                      try {
-                        const announcementData = {
-                          title: newAnnouncement.title,
-                          content: newAnnouncement.content,
-                          priority: newAnnouncement.priority,
-                          isActive: true,
-                          expiresAt: newAnnouncement.expiresAt ? new Date(newAnnouncement.expiresAt).toISOString() : undefined
-                        };
-
-                        await announcementApi.create(announcementData as any); // Type assertion needed due to Partial<Announcement> in api types vs strict types here, or just let it infer
-                        toast.success('Announcement published');
-                        // Refresh list
-                        const data = await announcementApi.getAll();
-                        setAnnouncements(data);
-                        setNewAnnouncement({
-                          title: '',
-                          content: '',
-                          priority: 'Low',
-                          expiresAt: ''
-                        });
-                        // Close dialog (optional, but good UX - requires adding state for dialog open)
-                      } catch (error) {
-                        console.error(error);
-                        toast.error(error instanceof Error ? error.message : 'Failed to create announcement');
-                      }
-                    }} className="space-y-4">
+                    <form
+                      onSubmit={(e) => e.preventDefault()}
+                      className="space-y-4"
+                    >
                       <div className="space-y-2">
                         <Label htmlFor="title">Title *</Label>
                         <Input
@@ -840,7 +1026,19 @@ export const AdminManagement = () => {
                           onChange={(e) => setNewAnnouncement({ ...newAnnouncement, expiresAt: e.target.value })}
                         />
                       </div>
-                      <Button type="submit" className="w-full">Publish Announcement</Button>
+                      <Button
+                        type="button"
+                        className="w-full"
+                        onClick={() => {
+                          if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
+                            toast.error('Title and content are required.');
+                            return;
+                          }
+                          setAnnouncementPublishConfirmOpen(true);
+                        }}
+                      >
+                        Publish Announcement
+                      </Button>
                     </form>
                   </DialogContent>
                 </Dialog>
@@ -875,21 +1073,11 @@ export const AdminManagement = () => {
                         </div>
                       </div>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={async () => {
-                          if (!confirm('Delete this announcement?')) return;
-                          try {
-                            await announcementApi.delete(announcement.id);
-                            toast.success('Announcement deleted');
-                            const data = await announcementApi.getAll();
-                            setAnnouncements(data);
-                          } catch (err) {
-                            console.error(err);
-                            toast.error('Failed to delete');
-                          }
-                        }}
+                        onClick={() => setAnnouncementPendingDelete(announcement)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -904,6 +1092,118 @@ export const AdminManagement = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={createUserConfirmOpen}
+        onOpenChange={setCreateUserConfirmOpen}
+        title="Create this user account?"
+        description={
+          <span>
+            A new account will be created for <strong>{newUser.name || '—'}</strong> ({' '}
+            <span className="font-mono">{newUser.userId || '—'}</span>) with role{' '}
+            <strong>{newUser.role}</strong>. This will be saved to the database.
+          </span>
+        }
+        confirmLabel="Yes, create user"
+        onConfirm={performCreateUser}
+      />
+
+      <ConfirmDialog
+        open={updateUserConfirmOpen}
+        onOpenChange={setUpdateUserConfirmOpen}
+        title="Save changes to this user?"
+        description={
+          editingUser ? (
+            <span>
+              Updates will apply to <strong>{editingUser.name}</strong> ({' '}
+              <span className="font-mono">{editingUser.userId}</span>) including name, email, and phone.
+            </span>
+          ) : (
+            'Save the edited profile details.'
+          )
+        }
+        confirmLabel="Save changes"
+        onConfirm={performUpdateUser}
+      />
+
+      <ConfirmDialog
+        open={!!deleteUserDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteUserDialog(null);
+            setDeleteConfirmation('');
+          }
+        }}
+        variant="destructive"
+        title="Delete this user permanently?"
+        description="This cannot be undone. The account will be removed from the system."
+        confirmLabel="Delete user"
+        confirmDisabled={!deleteUserDialog || deleteConfirmation !== deleteUserDialog.userId}
+        onConfirm={performDeleteUser}
+      >
+        {deleteUserDialog ? (
+          <div className="space-y-3">
+            <div className="p-3 bg-red-50 text-red-800 rounded-md text-sm">
+              You are about to delete <strong>{deleteUserDialog.name}</strong> ({' '}
+              <span className="font-mono">{deleteUserDialog.userId}</span>).
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="delete-user-confirm-input">
+                To confirm, type <span className="font-mono font-bold select-all">{deleteUserDialog.userId}</span>{' '}
+                below:
+              </Label>
+              <Input
+                id="delete-user-confirm-input"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder={deleteUserDialog.userId}
+                className="font-mono"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+        ) : null}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={saveSettingsConfirmOpen}
+        onOpenChange={setSaveSettingsConfirmOpen}
+        title="Save system settings?"
+        description="These values are used across the application (system name, contacts, notifications). Continue?"
+        confirmLabel="Save changes"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performSaveSettings}
+      />
+
+      <ConfirmDialog
+        open={announcementPublishConfirmOpen}
+        onOpenChange={setAnnouncementPublishConfirmOpen}
+        title="Publish this announcement?"
+        description={
+          <span>
+            This will broadcast “<strong>{newAnnouncement.title || 'Untitled'}</strong>” to users. Priority:{' '}
+            <strong>{newAnnouncement.priority}</strong>.
+          </span>
+        }
+        confirmLabel="Yes, publish"
+        onConfirm={performPublishAnnouncement}
+      />
+
+      <ConfirmDialog
+        open={!!announcementPendingDelete}
+        onOpenChange={(open) => !open && setAnnouncementPendingDelete(null)}
+        variant="destructive"
+        title="Delete this announcement?"
+        description={
+          announcementPendingDelete ? (
+            <span>
+              Remove “<strong>{announcementPendingDelete.title}</strong>” permanently? This cannot be undone.
+            </span>
+          ) : null
+        }
+        confirmLabel="Delete announcement"
+        onConfirm={performDeleteAnnouncement}
+      />
     </div>
   );
 };

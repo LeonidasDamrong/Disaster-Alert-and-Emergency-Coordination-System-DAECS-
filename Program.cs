@@ -41,7 +41,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = false; // Changed to false for easier testing
+    options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength = 6; // Minimum 6 characters
 })
 .AddRoles<IdentityRole>() // Add role management

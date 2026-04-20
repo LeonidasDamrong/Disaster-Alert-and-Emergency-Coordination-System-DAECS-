@@ -77,21 +77,6 @@ namespace FYP_Project_II.Models
             await signInManager.SignOutAsync();
         }
 
-        public virtual bool ChangePassword(string oldPassword, string newPassword)
-        {
-            // TODO: Implement password change logic
-            // This would typically validate old password and update with new one
-            if (Password == oldPassword)
-            {
-                Password = newPassword;
-                Console.WriteLine("Password changed successfully.");
-                return true;
-            }
-            Console.WriteLine("Old password is incorrect.");
-            return false;
-        }
-
-
         public virtual string GetRole()
         {
             return Role;

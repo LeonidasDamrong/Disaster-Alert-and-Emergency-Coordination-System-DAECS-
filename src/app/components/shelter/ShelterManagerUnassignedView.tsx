@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -9,6 +9,7 @@ import { shelterApi } from '../../lib/api';
 import { toast } from 'sonner';
 import { PlacesAddressAutocomplete } from '../PlacesAddressAutocomplete';
 import { hasValidShelterCoords } from '../../lib/shelterCoords';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 const emptyRegForm = () => ({
   shelterName: '',
@@ -22,12 +23,13 @@ export const ShelterManagerUnassignedView = () => {
   const [regDialogOpen, setRegDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyRegForm);
   const [submitting, setSubmitting] = useState(false);
+  const [submitRegConfirmOpen, setSubmitRegConfirmOpen] = useState(false);
 
   const handleRequestAssignment = () => {
     toast.info('Shelter assignment request will be sent to admin. This feature will be available soon.');
   };
 
-  const handleSubmitRegistration = async () => {
+  const requestSubmitRegistration = () => {
     if (!form.shelterName.trim() || !form.address.trim()) {
       toast.error('Shelter name and address are required');
       return;
@@ -36,6 +38,10 @@ export const ShelterManagerUnassignedView = () => {
       toast.error('Pick a full address from the Google suggestions so coordinates can be saved');
       return;
     }
+    setSubmitRegConfirmOpen(true);
+  };
+
+  const performSubmitRegistration = async () => {
     setSubmitting(true);
     try {
       await shelterApi.createRegistrationRequest({
@@ -50,6 +56,7 @@ export const ShelterManagerUnassignedView = () => {
       setForm(emptyRegForm());
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to submit request');
+      throw e;
     } finally {
       setSubmitting(false);
     }
@@ -120,7 +127,7 @@ export const ShelterManagerUnassignedView = () => {
                       onChange={(e) => setForm({ ...form, totalCapacity: parseInt(e.target.value, 10) || 0 })}
                     />
                   </div>
-                  <Button className="h-11" onClick={handleSubmitRegistration} disabled={submitting}>
+                  <Button className="h-11" onClick={requestSubmitRegistration} disabled={submitting}>
                     {submitting ? 'Submitting...' : 'Submit request'}
                   </Button>
                 </div>
@@ -129,6 +136,20 @@ export const ShelterManagerUnassignedView = () => {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={submitRegConfirmOpen}
+        onOpenChange={setSubmitRegConfirmOpen}
+        title="Submit shelter registration request?"
+        description={
+          <span>
+            Send <strong>{form.shelterName || '—'}</strong> (capacity {form.totalCapacity}) to admin for review? You can submit only one request per flow; ensure details are correct.
+          </span>
+        }
+        confirmLabel="Yes, submit request"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performSubmitRegistration}
+      />
     </div>
   );
 };

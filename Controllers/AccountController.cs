@@ -1,10 +1,12 @@
 using FYP_Project_II.Data;
 using FYP_Project_II.DTOs;
+using FYP_Project_II.Helpers;
 using FYP_Project_II.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -21,19 +23,22 @@ namespace FYP_Project_II.Controllers
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IdentityOptions _identityOptions;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             RoleManager<IdentityRole> roleManager,
             ApplicationDbContext context,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IOptions<IdentityOptions> identityOptions)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _roleManager = roleManager;
             _context = context;
             _configuration = configuration;
+            _identityOptions = identityOptions.Value;
         }
 
         [HttpPost("login")]
@@ -188,6 +193,69 @@ namespace FYP_Project_II.Controllers
             }
         }
 
+
+        /// <summary>
+        /// Allows any authenticated user (all roles) to change their own password after confirming the current password.
+        /// </summary>
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                return BadRequest(new { message = "Current password and new password are required." });
+            }
+
+            if (request.CurrentPassword == request.NewPassword)
+            {
+                return BadRequest(new { message = "New password must be different from your current password." });
+            }
+
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var appUser = await _userManager.FindByIdAsync(userId);
+            if (appUser == null)
+            {
+                return NotFound(new { message = "User not found." });
+            }
+
+            foreach (var validator in _userManager.PasswordValidators)
+            {
+                var formatCheck = await validator.ValidateAsync(_userManager, appUser, request.NewPassword);
+                if (!formatCheck.Succeeded)
+                {
+                    var (msg, errs) = IdentityPasswordErrorMapper.ToMessageAndList(formatCheck.Errors, _identityOptions);
+                    return BadRequest(new { message = msg, errors = errs });
+                }
+            }
+
+            var result = await _userManager.ChangePasswordAsync(appUser, request.CurrentPassword, request.NewPassword);
+            if (!result.Succeeded)
+            {
+                var (msg, errs) = IdentityPasswordErrorMapper.ToMessageAndList(result.Errors, _identityOptions);
+                return BadRequest(new { message = msg, errors = errs });
+            }
+
+            var currentUserId = User.FindFirst(ClaimTypes.Name)?.Value ?? appUser.UserName ?? "unknown";
+            var currentUserName = User.FindFirst("Name")?.Value ?? appUser.Name ?? "User";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = await AuditLog.GenerateNextIdAsync(_context),
+                Username = currentUserId,
+                Name = currentUserName,
+                Action = "Change Password",
+                Module = "Account",
+                Details = "User changed their own password.",
+                Timestamp = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password changed successfully." });
+        }
 
         [HttpGet("me")]
         [Authorize]

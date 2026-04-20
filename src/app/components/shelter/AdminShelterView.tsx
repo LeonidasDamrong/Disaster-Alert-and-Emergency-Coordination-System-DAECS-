@@ -21,6 +21,7 @@ import { ShelterReportModal } from './ShelterReportModal';
 import { PlacesAddressAutocomplete } from '../PlacesAddressAutocomplete';
 import { hasValidShelterCoords } from '../../lib/shelterCoords';
 import { sortByIdDesc } from '../../lib/sort';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 interface UserOption {
   userId: string;
@@ -52,6 +53,11 @@ export const AdminShelterView = () => {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<ShelterReportApi | null>(null);
+  const [createShelterConfirmOpen, setCreateShelterConfirmOpen] = useState(false);
+  const [updateShelterConfirmOpen, setUpdateShelterConfirmOpen] = useState(false);
+  const [approveRegistrationConfirm, setApproveRegistrationConfirm] = useState<{ requestId: string; shelterName: string } | null>(null);
+  const [rejectRegistrationConfirmOpen, setRejectRegistrationConfirmOpen] = useState(false);
+  const [generateReportConfirm, setGenerateReportConfirm] = useState<{ shelterId: string; shelterName: string } | null>(null);
 
   const shelterManagers = users.filter(u => u.role === 'Shelter Manager');
 
@@ -105,7 +111,7 @@ export const AdminShelterView = () => {
     }
   }, []);
 
-  const handleCreateShelter = async () => {
+  const requestCreateShelter = () => {
     if (!form.shelterName.trim() || !form.address.trim()) {
       toast.error('Name and address are required');
       return;
@@ -114,6 +120,10 @@ export const AdminShelterView = () => {
       toast.error('Pick a full address from the Google suggestions so coordinates can be saved');
       return;
     }
+    setCreateShelterConfirmOpen(true);
+  };
+
+  const performCreateShelter = async () => {
     try {
       await shelterApi.create({
         shelterName: form.shelterName,
@@ -138,15 +148,21 @@ export const AdminShelterView = () => {
       await loadShelters();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to create shelter');
+      throw e;
     }
   };
 
-  const handleUpdateShelter = async () => {
+  const requestUpdateShelter = () => {
     if (!editShelter || !form.shelterName.trim() || !form.address.trim()) return;
     if (!hasValidShelterCoords(form.latitude, form.longitude)) {
       toast.error('Pick a full address from the Google suggestions so coordinates can be saved');
       return;
     }
+    setUpdateShelterConfirmOpen(true);
+  };
+
+  const performUpdateShelter = async () => {
+    if (!editShelter) return;
     try {
       await shelterApi.update(editShelter.id, {
         shelterId: editShelter.id,
@@ -166,6 +182,7 @@ export const AdminShelterView = () => {
       await loadShelters();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to update shelter');
+      throw e;
     }
   };
 
@@ -181,27 +198,31 @@ export const AdminShelterView = () => {
     }
   };
 
-  const handleApproveRequest = async (requestId: string) => {
+  const performApproveRegistration = async () => {
+    if (!approveRegistrationConfirm) return;
     try {
-      await shelterApi.approveRegistrationRequest(requestId);
+      await shelterApi.approveRegistrationRequest(approveRegistrationConfirm.requestId);
       toast.success('Request approved. Shelter created.');
       await loadRegistrationRequests();
       await loadShelters();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to approve');
+      throw e;
     }
   };
 
-  const handleRejectRequest = async () => {
+  const performRejectRegistration = async () => {
     if (!rejectDialog) return;
     try {
       await shelterApi.rejectRegistrationRequest(rejectDialog.requestId, rejectReason || undefined);
       toast.success('Request rejected');
       setRejectDialog(null);
       setRejectReason('');
+      setRejectRegistrationConfirmOpen(false);
       await loadRegistrationRequests();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to reject');
+      throw e;
     }
   };
 
@@ -218,14 +239,16 @@ export const AdminShelterView = () => {
     });
   };
 
-  const handleGenerateReport = async (shelterId: string, shelterName: string) => {
+  const performGenerateReport = async () => {
+    if (!generateReportConfirm) return;
     try {
-      const report = await shelterApi.generateReport(shelterId);
+      const report = await shelterApi.generateReport(generateReportConfirm.shelterId);
       setGeneratedReport(report);
       setShowReportModal(true);
-      toast.success(`Report generated for ${shelterName}`);
+      toast.success(`Report generated for ${generateReportConfirm.shelterName}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to generate report');
+      throw e;
     }
   };
 
@@ -322,7 +345,7 @@ export const AdminShelterView = () => {
                 </Select>
               </div>
             </div>
-            <Button onClick={handleCreateShelter}>Create</Button>
+            <Button onClick={requestCreateShelter}>Create</Button>
           </DialogContent>
         </Dialog>
       </div>
@@ -372,7 +395,7 @@ export const AdminShelterView = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" className="text-green-600" onClick={() => handleApproveRequest(req.requestId)} title="Approve"><Check className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="sm" className="text-green-600" onClick={() => setApproveRegistrationConfirm({ requestId: req.requestId, shelterName: req.shelterName })} title="Approve"><Check className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="sm" className="text-red-600" onClick={() => setRejectDialog({ requestId: req.requestId, request: req })} title="Reject"><X className="h-4 w-4" /></Button>
                         </div>
                       </TableCell>
@@ -435,7 +458,7 @@ export const AdminShelterView = () => {
             <div className="grid gap-2"><Label>Reason (optional)</Label><Input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason for rejection" /></div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleRejectRequest}>Reject</Button>
+              <Button variant="destructive" onClick={() => setRejectRegistrationConfirmOpen(true)}>Reject</Button>
             </div>
           </div>
         </DialogContent>
@@ -521,7 +544,7 @@ export const AdminShelterView = () => {
                       )}
                     </DialogContent>
                   </Dialog>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => handleGenerateReport(shelter.id, shelter.name)}><Printer className="h-4 w-4" />Print report</Button>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setGenerateReportConfirm({ shelterId: shelter.id, shelterName: shelter.name })}><Printer className="h-4 w-4" />Print report</Button>
                 </div>
               </CardContent>
             </Card>
@@ -612,7 +635,7 @@ export const AdminShelterView = () => {
                 </Select>
               </div>
             </div>
-            <Button onClick={handleUpdateShelter}>Save changes</Button>
+            <Button onClick={requestUpdateShelter}>Save changes</Button>
           </DialogContent>
         </Dialog>
       )}
@@ -620,6 +643,100 @@ export const AdminShelterView = () => {
       {shelters.length === 0 && (
         <Card><CardContent className="py-12 text-center text-gray-500">No shelters. Add one using the button above.</CardContent></Card>
       )}
+
+      <ConfirmDialog
+        open={createShelterConfirmOpen}
+        onOpenChange={setCreateShelterConfirmOpen}
+        title="Create this shelter?"
+        description={
+          <span>
+            A new shelter will be saved with capacity <strong>{form.totalCapacity}</strong> and status{' '}
+            <strong>{form.status}</strong>.
+          </span>
+        }
+        confirmLabel="Yes, create shelter"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performCreateShelter}
+      />
+
+      <ConfirmDialog
+        open={updateShelterConfirmOpen}
+        onOpenChange={setUpdateShelterConfirmOpen}
+        title="Save shelter changes?"
+        description={
+          editShelter ? (
+            <span>
+              Updates will apply to <strong>{editShelter.name}</strong> including address, capacity, status, and manager assignment.
+            </span>
+          ) : (
+            'Save the edited shelter details.'
+          )
+        }
+        confirmLabel="Save changes"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performUpdateShelter}
+      />
+
+      <ConfirmDialog
+        open={!!approveRegistrationConfirm}
+        onOpenChange={(open) => {
+          if (!open) setApproveRegistrationConfirm(null);
+        }}
+        title="Approve this registration request?"
+        description={
+          approveRegistrationConfirm ? (
+            <span>
+              A new shelter <strong>{approveRegistrationConfirm.shelterName}</strong> will be created from this request.
+            </span>
+          ) : null
+        }
+        confirmLabel="Yes, approve"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performApproveRegistration}
+      />
+
+      <ConfirmDialog
+        open={rejectRegistrationConfirmOpen && !!rejectDialog}
+        onOpenChange={(open) => {
+          if (!open) setRejectRegistrationConfirmOpen(false);
+        }}
+        variant="destructive"
+        title="Reject this registration request?"
+        description={
+          rejectDialog ? (
+            <span>
+              The request for <strong>{rejectDialog.request.shelterName}</strong> will be rejected
+              {rejectReason.trim() ? (
+                <>
+                  {' '}
+                  with reason: <em>{rejectReason.trim()}</em>
+                </>
+              ) : (
+                ' with no reason provided'
+              )}
+              .
+            </span>
+          ) : null
+        }
+        confirmLabel="Yes, reject"
+        onConfirm={performRejectRegistration}
+      />
+
+      <ConfirmDialog
+        open={!!generateReportConfirm}
+        onOpenChange={(open) => !open && setGenerateReportConfirm(null)}
+        title="Generate shelter report?"
+        description={
+          generateReportConfirm ? (
+            <span>
+              Generate and open a printable status report for <strong>{generateReportConfirm.shelterName}</strong>?
+            </span>
+          ) : null
+        }
+        confirmLabel="Generate report"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performGenerateReport}
+      />
 
       <ShelterReportModal
         open={showReportModal}

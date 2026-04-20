@@ -11,6 +11,7 @@ import { shelterApi } from '../../lib/api';
 import { toast } from 'sonner';
 import { ShelterReportModal } from './ShelterReportModal';
 import { sortByIdDesc } from '../../lib/sort';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 interface ShelterManagerAssignedViewProps {
   shelter: Shelter;
@@ -30,6 +31,9 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
   });
   const [showReportModal, setShowReportModal] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<ShelterReportApi | null>(null);
+  const [registerEvacueeConfirmOpen, setRegisterEvacueeConfirmOpen] = useState(false);
+  const [checkoutConfirm, setCheckoutConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [generateReportConfirmOpen, setGenerateReportConfirmOpen] = useState(false);
 
   const loadDetails = useCallback(async () => {
     setLoading(true);
@@ -47,12 +51,17 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
     loadDetails();
   }, [loadDetails]);
 
-  const handleRegisterEvacuee = async () => {
+  const requestRegisterEvacuee = () => {
     const age = parseInt(newEvacuee.age, 10);
     if (!newEvacuee.name || !newEvacuee.phone || isNaN(age)) {
       toast.error('Please fill name, age and phone');
       return;
     }
+    setRegisterEvacueeConfirmOpen(true);
+  };
+
+  const performRegisterEvacuee = async () => {
+    const age = parseInt(newEvacuee.age, 10);
     try {
       await shelterApi.registerEvacuee(shelter.id, {
         evacueeName: newEvacuee.name,
@@ -68,21 +77,24 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
       onRefresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to register evacuee');
+      throw e;
     }
   };
 
-  const handleCheckoutEvacuee = async (evacueeId: string) => {
+  const performCheckoutEvacuee = async () => {
+    if (!checkoutConfirm) return;
     try {
-      await shelterApi.checkoutEvacuee(shelter.id, evacueeId);
+      await shelterApi.checkoutEvacuee(shelter.id, checkoutConfirm.id);
       toast.success('Evacuee checked out');
       await loadDetails();
       onRefresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to check out evacuee');
+      throw e;
     }
   };
 
-  const handleGenerateReport = async () => {
+  const performGenerateReport = async () => {
     try {
       const report = await shelterApi.generateReport(shelter.id);
       setGeneratedReport(report);
@@ -90,6 +102,7 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
       toast.success(`Report generated for ${shelter.name}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to generate report');
+      throw e;
     }
   };
 
@@ -214,7 +227,7 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
                       variant="ghost"
                       size="sm"
                       className="text-amber-600"
-                      onClick={() => handleCheckoutEvacuee(ev.id)}
+                      onClick={() => setCheckoutConfirm({ id: ev.id, name: ev.name })}
                       title="Check out"
                     >
                       <LogOut className="h-4 w-4" />
@@ -263,7 +276,7 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
             </div>
             <Button
               className="mt-4 gap-2"
-              onClick={handleRegisterEvacuee}
+              onClick={requestRegisterEvacuee}
               disabled={!newEvacuee.name || !newEvacuee.age || !newEvacuee.phone || shelter.status === 'Full'}
             >
               <Plus className="h-4 w-4" /> Register evacuee
@@ -273,11 +286,51 @@ export const ShelterManagerAssignedView = ({ shelter: initialShelter, onRefresh 
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" className="gap-2" onClick={handleGenerateReport}>
+        <Button variant="outline" className="gap-2" onClick={() => setGenerateReportConfirmOpen(true)}>
           <Printer className="h-4 w-4" />
           Generate status report
         </Button>
       </div>
+      <ConfirmDialog
+        open={registerEvacueeConfirmOpen}
+        onOpenChange={setRegisterEvacueeConfirmOpen}
+        title="Register this evacuee?"
+        description={
+          <span>
+            Add <strong>{newEvacuee.name || '—'}</strong> to <strong>{shelter.name}</strong> with the details you entered?
+          </span>
+        }
+        confirmLabel="Yes, register"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performRegisterEvacuee}
+      />
+
+      <ConfirmDialog
+        open={!!checkoutConfirm}
+        onOpenChange={(open) => !open && setCheckoutConfirm(null)}
+        variant="destructive"
+        title="Check out this evacuee?"
+        description={
+          checkoutConfirm ? (
+            <span>
+              <strong>{checkoutConfirm.name}</strong> will be removed from the active evacuee list for this shelter. This action should reflect a real departure.
+            </span>
+          ) : null
+        }
+        confirmLabel="Check out"
+        onConfirm={performCheckoutEvacuee}
+      />
+
+      <ConfirmDialog
+        open={generateReportConfirmOpen}
+        onOpenChange={setGenerateReportConfirmOpen}
+        title="Generate status report?"
+        description={`Generate and open a printable report for ${shelter.name}?`}
+        confirmLabel="Generate report"
+        confirmButtonClassName="bg-green-600 hover:bg-green-700 focus-visible:ring-green-600 text-white"
+        onConfirm={performGenerateReport}
+      />
+
       <ShelterReportModal
         open={showReportModal}
         onOpenChange={setShowReportModal}
